@@ -11,7 +11,7 @@
 --
 --  Mức ưu tiên:  P0 = bắt buộc | P1 = nên có | P2 = nếu còn thời gian
 --  Bảng P0: users, stores, categories, listings, orders
---  Bảng P1: favorites      Bảng P2: reviews, notifications
+--  Bảng P1: favorites      Bảng P2: reviews, notificationslastbit
 -- =====================================================================
 
 CREATE DATABASE IF NOT EXISTS lastbite

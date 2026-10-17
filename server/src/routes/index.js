@@ -7,5 +7,6 @@ router.use('/listings', require('./listings.routes'));
 router.use('/orders', require('./orders.routes'));
 router.use('/stores', require('./stores.routes'));
 router.use('/admin', require('./admin.routes'));
+router.use('/uploads', require('./uploads.routes'));
 
 module.exports = router;
