@@ -110,8 +110,8 @@ router.post('/', asyncHandler(async (req, res, next) => {
       image_url || null,
       origPrice,
       sPrice,
-      qty,
-      qty,
+      qty,                   // Đây là giá trị cho cột quantity
+      qty,                   // Đây là giá trị cho cột remaining (Gán bằng quantity lúc tạo mới)
       new Date(pickup_start),
       new Date(pickup_end)
     ]
