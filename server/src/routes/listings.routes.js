@@ -1,11 +1,12 @@
 // Tin đăng suất ăn.
 // Công khai (VT1): GET /api/listings (tìm kiếm, lọc), GET /api/listings/:id
-// Cửa hàng (VT3): POST/PUT/DELETE /api/listings
+// Cửa hàng (VT3): POST/PUT/DELETE /api/listings, upload ảnh bằng multer
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
+const { getListings, getListingById } = require('../controllers/listings.controller');
 
 /**
  * Helper: Xác thực cửa hàng hiện tại.
@@ -285,7 +286,8 @@ router.delete('/:id', asyncHandler(async (req, res, next) => {
 // ==============================================================
 // 4. API CÔNG KHAI (VT1 giữ chỗ)
 // ==============================================================
-router.get('/', (req, res) => res.status(501).json({ success: false, message: 'Chưa triển khai: GET /listings (VT1)' }));
-router.get('/:id', (req, res) => res.status(501).json({ success: false, message: 'Chưa triển khai: GET /listings/:id (VT1)' }));
+// QUY TẮC: đường dẫn cố định phải khai báo TRƯỚC '/:id'
+router.get('/', getListings);
+router.get('/:id', getListingById);
 
 module.exports = router;
