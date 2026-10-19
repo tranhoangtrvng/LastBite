@@ -3,6 +3,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthPage from './pages/auth/AuthPage';
+import ListingList from './components/store/ListingList'; // <-- Code của bạn được giữ lại ở đây
 
 // Component bảo vệ Route: Chưa đăng nhập thì bắt chuyển về /auth
 function ProtectedRoute({ children }) {
@@ -71,6 +72,18 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <HomePage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Trang Quản lý tin đăng của bạn - Yêu cầu đăng nhập */}
+          <Route
+            path="/store/listings"
+            element={
+              <ProtectedRoute>
+                <div className="min-h-screen bg-gray-50">
+                  <ListingList />
+                </div>
               </ProtectedRoute>
             }
           />
