@@ -1,82 +1,66 @@
 // client/src/App.jsx
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
+import BuyerLayout from './layouts/BuyerLayout';
+import SearchPage from './pages/buyer/SearchPage';
 import AuthPage from './pages/auth/AuthPage';
 
-// Component bảo vệ Route: Chưa đăng nhập thì bắt chuyển về /auth
-function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth();
+// Component giữ chỗ cho Trang Chi tiết món ăn (Frame 3)
+const DummyFoodDetail = () => (
+  <div className="bg-white p-8 rounded-2xl border border-[#E5E7EB] text-center max-w-2xl mx-auto space-y-3">
+    <span className="inline-block p-3 bg-blue-50 text-[#2563EB] rounded-full text-xl font-bold">🍽️</span>
+    <h1 className="text-xl font-bold text-[#111827]">Chi tiết suất ăn (Frame 3)</h1>
+    <p className="text-sm text-[#4B5563]">
+      Trang hiển thị hình ảnh lớn, mô tả bảo quản, địa chỉ quán và khối đặt chỗ cố định.
+    </p>
+  </div>
+);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">
-        Đang tải...
-      </div>
-    );
-  }
+// Component giữ chỗ cho Trang Lịch sử đơn hàng (Frame 6)
+const DummyOrderHistory = () => (
+  <div className="bg-white p-8 rounded-2xl border border-[#E5E7EB] text-center max-w-2xl mx-auto space-y-3">
+    <span className="inline-block p-3 bg-amber-50 text-amber-600 rounded-full text-xl font-bold">📋</span>
+    <h1 className="text-xl font-bold text-[#111827]">Đơn hàng của tôi (Frame 6)</h1>
+    <p className="text-sm text-[#4B5563]">
+      Khu vực hiển thị danh sách đơn với 4 tab trạng thái: Chờ nhận, Đã nhận, Đã huỷ, Không đến.
+    </p>
+  </div>
+);
 
-  if (!isAuthenticated) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  return children;
-}
-
-// Trang chủ sau khi đăng nhập thành công
-function HomePage() {
-  const { user, logout } = useAuth();
-
-  return (
-    <div className="min-h-screen bg-[#F9FAFB] p-8 flex items-center justify-center">
-      <div className="max-w-md w-full bg-white p-8 rounded-xl border border-[#E5E7EB] text-center space-y-4 shadow-sm">
-        <h2 className="text-xl font-bold text-[#111827]">Trang chủ LastBite</h2>
-        
-        <p className="text-sm text-gray-600">
-          Xin chào,{' '}
-          <span className="font-bold text-[#2563EB]">
-            {user?.name || user?.emailOrPhone}
-          </span>
-          !
-        </p>
-        
-        <p className="text-xs text-emerald-600 bg-emerald-50 py-2 px-3 rounded-lg border border-emerald-200">
-          ✓ Bạn đã đăng nhập vào hệ thống thành công.
-        </p>
-
-        <button
-          onClick={logout}
-          className="w-full py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition cursor-pointer"
-        >
-          Đăng xuất
-        </button>
-      </div>
-    </div>
-  );
-}
+// Component giữ chỗ riêng biệt cho Trang Hồ sơ cá nhân (Frame 7)
+const DummyProfile = () => (
+  <div className="bg-white p-8 rounded-2xl border border-[#E5E7EB] text-center max-w-2xl mx-auto space-y-3">
+    <span className="inline-block p-3 bg-emerald-50 text-emerald-600 rounded-full text-xl font-bold">👤</span>
+    <h1 className="text-xl font-bold text-[#111827]">Hồ sơ cá nhân (Frame 7)</h1>
+    <p className="text-sm text-[#4B5563]">
+      Khu vực quản lý thông tin tài khoản cá nhân, cài đặt bảo mật và huy hiệu tác động giải cứu suất ăn.
+    </p>
+  </div>
+);
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Trang Đăng nhập / Đăng ký */}
+          {/* 1. Phân hệ Xác thực (Auth) */}
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/login" element={<Navigate to="/auth" replace />} />
-          <Route path="/register" element={<Navigate to="/auth" replace />} />
 
-          {/* Trang chủ yêu cầu phải đăng nhập */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <HomePage />
-              </ProtectedRoute>
-            }
-          />
+          {/* 2. Phân hệ Người mua (Dùng chung BuyerLayout) */}
+          <Route element={<BuyerLayout />}>
+            <Route path="/" element={<Navigate to="/foods" replace />} />
+            <Route path="/foods" element={<SearchPage />} />
+            <Route path="/foods/:id" element={<DummyFoodDetail />} />
+            
+            {/* Tách biệt rõ ràng giữa Đơn hàng và Hồ sơ cá nhân */}
+            <Route path="/orders" element={<DummyOrderHistory />} />
+            <Route path="/profile" element={<DummyProfile />} />
+          </Route>
 
-          {/* Các đường dẫn không tồn tại đều chuyển về / */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* 3. Route điều hướng mặc định */}
+          <Route path="*" element={<Navigate to="/foods" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
