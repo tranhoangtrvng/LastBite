@@ -1,4 +1,4 @@
-// src/pages/buyer/SearchPage.jsx
+// client/src/pages/buyer/SearchPage.jsx
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -10,84 +10,84 @@ import {
   PickupSuccessModal 
 } from '../../components/common';
 
-// Dữ liệu chuẩn khớp 100% với mã của FilterSidebar (com, banhmi, bunpho, trasua, doanvat)
+// Dữ liệu chuẩn khớp 100% với FilterSidebar và FoodDetailPage
 const MOCK_FOODS = [
   {
     id: 1,
     title: 'Cơm gà xối mỡ sốt cay',
     storeName: 'Cơm Gà Bà Năm',
-    address: 'Đống Đa, Hà Nội',
+    address: '123 Chùa Láng, Đống Đa, Hà Nội',
     originalPrice: 45000,
     discountPrice: 20000,
     quantity: 3,
     pickupTimeRange: '20:30 - 21:30',
-    category: 'com', // Khớp với category ID trong FilterSidebar
-    timeSlot: 'late', // Sau 20:00
+    category: 'com',
+    timeSlot: 'late',
     imageUrl: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=500&auto=format&fit=crop&q=60'
   },
   {
     id: 2,
     title: 'Bánh mì pate trứng chả',
     storeName: 'Bánh Mì Phố Cổ',
-    address: 'Cầu Giấy, Hà Nội',
+    address: '45 Cầu Giấy, Quan Hoa, Cầu Giấy, Hà Nội',
     originalPrice: 35000,
     discountPrice: 15000,
     quantity: 5,
     pickupTimeRange: '12:00 - 13:00',
     category: 'banhmi',
-    timeSlot: 'lunch', // Trưa 11:00 - 13:30
+    timeSlot: 'lunch',
     imageUrl: 'https://images.unsplash.com/photo-1626804475297-41608ea09aeb?w=500&auto=format&fit=crop&q=60'
   },
   {
     id: 3,
     title: 'Bún bò Huế đặc biệt',
     storeName: 'Bún Bò O Trâm',
-    address: 'Thanh Xuân, Hà Nội',
+    address: '88 Nguyễn Trãi, Thượng Đình, Thanh Xuân, Hà Nội',
     originalPrice: 50000,
     discountPrice: 25000,
     quantity: 2,
     pickupTimeRange: '19:00 - 20:00',
     category: 'bunpho',
-    timeSlot: 'evening', // Tối 18:00 - 20:00
+    timeSlot: 'evening',
     imageUrl: 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=500&auto=format&fit=crop&q=60'
   },
   {
     id: 4,
     title: 'Trà sữa Oolong kem trứng',
     storeName: 'Trà Sữa Nhà Bông',
-    address: 'Hai Bà Trưng, Hà Nội',
+    address: '15 Đại Cồ Việt, Hai Bà Trưng, Hà Nội',
     originalPrice: 40000,
     discountPrice: 18000,
     quantity: 4,
     pickupTimeRange: '21:00 - 22:00',
     category: 'trasua',
-    timeSlot: 'late', // Sau 20:00
+    timeSlot: 'late',
     imageUrl: 'https://images.unsplash.com/photo-1558857563-b371a5c60205?w=500&auto=format&fit=crop&q=60'
   },
   {
     id: 5,
     title: 'Cơm sườn bì chả nướng than',
     storeName: 'Cơm Tấm 1989',
-    address: 'Ba Đình, Hà Nội',
+    address: '10 Kim Mã, Ba Đình, Hà Nội',
     originalPrice: 55000,
     discountPrice: 25000,
     quantity: 1,
     pickupTimeRange: '12:30 - 13:30',
     category: 'com',
-    timeSlot: 'lunch', // Trưa 11:00 - 13:30
+    timeSlot: 'lunch',
     imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=60'
   },
   {
     id: 6,
     title: 'Nem chua rán nướng hồ tây',
     storeName: 'Ăn Vặt Cô Béo',
-    address: 'Tây Hồ, Hà Nội',
+    address: '22 Trích Sài, Tây Hồ, Hà Nội',
     originalPrice: 30000,
     discountPrice: 12000,
     quantity: 6,
     pickupTimeRange: '18:30 - 19:30',
     category: 'doanvat',
-    timeSlot: 'evening', // Tối 18:00 - 20:00
+    timeSlot: 'evening',
     imageUrl: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=500&auto=format&fit=crop&q=60'
   }
 ];
@@ -105,11 +105,11 @@ export default function SearchPage() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [pickupCodeData, setPickupCodeData] = useState(null);
 
-  // LOGIC LỌC VÀ SẮP XẾP CHUẨN XÁC
+  // Logic lọc và sắp xếp
   const processedFoods = useMemo(() => {
     let result = [...MOCK_FOODS];
 
-    // 1. Lọc từ khóa tìm kiếm
+    // 1. Lọc từ khóa
     if (keyword.trim()) {
       const q = keyword.toLowerCase().trim();
       result = result.filter(
@@ -120,12 +120,12 @@ export default function SearchPage() {
       );
     }
 
-    // 2. Lọc theo danh mục (hỗ trợ cả mã 'com' lẫn nhãn 'Cơm')
+    // 2. Lọc danh mục
     if (filters.categories && filters.categories.length > 0) {
       result = result.filter((item) => filters.categories.includes(item.category));
     }
 
-    // 3. Lọc khoảng giá (khớp với FilterSidebar: under20, 20to40, over40)
+    // 3. Lọc khoảng giá
     if (filters.priceRange && filters.priceRange !== 'all') {
       if (filters.priceRange === 'under20') {
         result = result.filter((item) => item.discountPrice < 20000);
@@ -136,7 +136,7 @@ export default function SearchPage() {
       }
     }
 
-    // 4. Lọc khung giờ nhận hàng (lunch, evening, late)
+    // 4. Lọc khung giờ nhận
     if (filters.pickupTimes && filters.pickupTimes.length > 0) {
       result = result.filter((item) => filters.pickupTimes.includes(item.timeSlot));
     }
@@ -153,20 +153,28 @@ export default function SearchPage() {
     return result;
   }, [keyword, filters, sortBy]);
 
+  // Xử lý khi xác nhận đặt chỗ: sinh mã và đồng bộ dữ liệu vào modal thành công
   const handleBookingConfirm = (bookingInfo) => {
     const mockPickupCode = 'LB-' + Math.floor(1000 + Math.random() * 9000);
+
     setPickupCodeData({
       ...bookingInfo,
+      pickupCode: mockPickupCode,
       code: mockPickupCode,
-      pickupWindow: selectedItem.pickupTimeRange,
-      address: `${selectedItem.storeName} - ${selectedItem.address}`
+      pickupTimeRange: selectedItem.pickupTimeRange,
+      storeAddress: `${selectedItem.storeName} - ${selectedItem.address}`,
+      address: `${selectedItem.storeName} - ${selectedItem.address}`,
+      title: selectedItem.title,
+      selectedQuantity: bookingInfo.selectedQuantity || 1,
+      totalPrice: bookingInfo.totalPrice || selectedItem.discountPrice
     });
-    setSelectedItem(null);
+
+    setSelectedItem(null); // Đóng BookingModal
   };
 
   return (
     <div className="flex flex-col lg:flex-row gap-8 items-start">
-      {/* CỘT TRÁI: SIDEBAR BỘ LỌC (3 CỘT) */}
+      {/* CỘT TRÁI: SIDEBAR BỘ LỌC */}
       <aside className="w-full lg:w-[280px] shrink-0 sticky top-28">
         <FilterSidebar
           onApplyFilter={(receivedFilters) => setFilters(receivedFilters)}
@@ -174,9 +182,8 @@ export default function SearchPage() {
         />
       </aside>
 
-      {/* CỘT PHẢI: KẾT QUẢ TÌM KIẾM (9 CỘT) */}
+      {/* CỘT PHẢI: KẾT QUẢ TÌM KIẾM */}
       <section className="flex-1 w-full space-y-6">
-        {/* Toolbar: Thanh tìm kiếm & Sắp xếp */}
         <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-[#E5E7EB]">
           <SearchBar
             value={keyword}
@@ -191,7 +198,6 @@ export default function SearchPage() {
           </div>
         </div>
 
-        {/* Danh sách món ăn sau khi lọc */}
         {processedFoods.length === 0 ? (
           <div className="bg-white p-12 text-center rounded-xl border border-[#E5E7EB] space-y-2">
             <p className="text-base font-semibold text-gray-700">Không tìm thấy suất ăn nào phù hợp</p>
@@ -211,7 +217,7 @@ export default function SearchPage() {
         )}
       </section>
 
-      {/* Frame 4: Modal Đặt Chỗ */}
+      {/* Frame 4: Modal Đặt giữ chỗ */}
       {selectedItem && (
         <BookingModal
           item={selectedItem}
@@ -221,12 +227,14 @@ export default function SearchPage() {
         />
       )}
 
-      {/* Frame 5: Modal Mã Nhận 6 Ký Tự */}
+      {/* Frame 5: Modal Mã nhận hàng 6 ký tự (Đã đồng bộ đầy đủ bookingData và onGoHome) */}
       {pickupCodeData && (
         <PickupSuccessModal
           isOpen={Boolean(pickupCodeData)}
+          bookingData={pickupCodeData}
           data={pickupCodeData}
           onClose={() => setPickupCodeData(null)}
+          onGoHome={() => setPickupCodeData(null)}
           onViewOrders={() => {
             setPickupCodeData(null);
             navigate('/orders');

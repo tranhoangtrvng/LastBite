@@ -4,20 +4,12 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import BuyerLayout from './layouts/BuyerLayout';
 import SearchPage from './pages/buyer/SearchPage';
+import FoodDetailPage from './pages/buyer/FoodDetailPage';
 import AuthPage from './pages/auth/AuthPage';
 
-const DummyFoodDetail = () => (
-  <div className="bg-white p-8 rounded-2xl border border-[#E5E7EB] text-center max-w-2xl mx-auto space-y-3">
-    <span className="inline-block p-3 bg-blue-50 text-[#2563EB] rounded-full text-xl font-bold">🍽️</span>
-    <h1 className="text-xl font-bold text-[#111827]">Chi tiết suất ăn (Frame 3)</h1>
-    <p className="text-sm text-[#4B5563]">
-      Trang hiển thị hình ảnh lớn, mô tả bảo quản, địa chỉ quán và khối đặt chỗ cố định.
-    </p>
-  </div>
-);
-
+// Component giữ chỗ cho Trang Lịch sử đơn hàng (Frame 6)
 const DummyOrderHistory = () => (
-  <div className="bg-white p-8 rounded-2xl border border-[#E5E7EB] text-center max-w-2xl mx-auto space-y-3">
+  <div className="bg-white p-8 rounded-2xl border border-[#E5E7EB] text-center max-w-2xl mx-auto space-y-3 shadow-sm">
     <span className="inline-block p-3 bg-amber-50 text-amber-600 rounded-full text-xl font-bold">📋</span>
     <h1 className="text-xl font-bold text-[#111827]">Đơn hàng của tôi (Frame 6)</h1>
     <p className="text-sm text-[#4B5563]">
@@ -26,12 +18,13 @@ const DummyOrderHistory = () => (
   </div>
 );
 
+// Component giữ chỗ cho Trang Hồ sơ cá nhân (Frame 7)
 const DummyProfile = () => (
-  <div className="bg-white p-8 rounded-2xl border border-[#E5E7EB] text-center max-w-2xl mx-auto space-y-3">
+  <div className="bg-white p-8 rounded-2xl border border-[#E5E7EB] text-center max-w-2xl mx-auto space-y-3 shadow-sm">
     <span className="inline-block p-3 bg-emerald-50 text-emerald-600 rounded-full text-xl font-bold">👤</span>
     <h1 className="text-xl font-bold text-[#111827]">Hồ sơ cá nhân (Frame 7)</h1>
     <p className="text-sm text-[#4B5563]">
-      Khu vực quản lý thông tin tài khoản cá nhân, cài đặt bảo mật và huy hiệu tác động giải cứu suất ăn.
+      Khu vực quản lý thông tin tài khoản cá nhân, cài đặt bảo mật và huy hiệu giải cứu suất ăn.
     </p>
   </div>
 );
@@ -41,20 +34,30 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Phân hệ Xác thực */}
+          {/* 1. Phân hệ Xác thực (Auth) */}
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/login" element={<Navigate to="/auth" replace />} />
+          <Route path="/register" element={<Navigate to="/auth" replace />} />
 
-          {/* Phân hệ Người mua (kèm BuyerLayout) */}
+          {/* 2. Phân hệ Người mua (Dùng chung BuyerLayout có Header 80px & Footer) */}
           <Route element={<BuyerLayout />}>
+            {/* Chuyển hướng mặc định về danh sách món ăn */}
             <Route path="/" element={<Navigate to="/foods" replace />} />
+            
+            {/* Trang Danh sách & Bộ lọc tìm kiếm món ăn (Frame 2) */}
             <Route path="/foods" element={<SearchPage />} />
-            <Route path="/foods/:id" element={<DummyFoodDetail />} />
+            
+            {/* Trang Chi tiết suất ăn (Frame 3) */}
+            <Route path="/foods/:id" element={<FoodDetailPage />} />
+            
+            {/* Trang Lịch sử đơn hàng (Frame 6) */}
             <Route path="/orders" element={<DummyOrderHistory />} />
+            
+            {/* Trang Quản lý hồ sơ cá nhân (Frame 7) */}
             <Route path="/profile" element={<DummyProfile />} />
           </Route>
 
-          {/* Điều hướng mặc định */}
+          {/* 3. Bắt các đường dẫn không tồn tại (Fallback 404) */}
           <Route path="*" element={<Navigate to="/foods" replace />} />
         </Routes>
       </BrowserRouter>
