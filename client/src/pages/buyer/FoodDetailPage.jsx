@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { BookingModal, PickupSuccessModal } from '../../components/common';
 
-// Dữ liệu mẫu đồng bộ với danh sách món ở SearchPage
 const MOCK_FOODS = [
   {
     id: 1,
@@ -95,22 +94,44 @@ export default function FoodDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // State điều khiển các modal đặt chỗ và hiển thị mã nhận
+  const [foodList, setFoodList] = useState(MOCK_FOODS);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [pickupCodeData, setPickupCodeData] = useState(null);
 
-  // Lấy chi tiết món theo ID trên URL, fallback về món đầu tiên nếu không khớp
-  const food = MOCK_FOODS.find((item) => item.id === parseInt(id, 10)) || MOCK_FOODS[0];
+  const food = foodList.find((item) => item.id === parseInt(id, 10)) || foodList[0];
   const discountPercent = Math.round(((food.originalPrice - food.discountPrice) / food.originalPrice) * 100);
+  const isOutOfStock = food.quantity <= 0;
 
-  // Xử lý khi người dùng xác nhận đặt món từ BookingModal (Frame 4)
+  // 1. Mở modal đặt chỗ (chặn ngay nếu hết suất)
+  const handleOpenBooking = () => {
+    if (isOutOfStock) {
+      alert(`Rất tiếc! Món "${food.title}" hôm nay đã hết suất thanh lý.`);
+      return;
+    }
+    setIsBookingOpen(true);
+  };
+
+  // 2. Xác nhận đặt chỗ -> Trừ tồn kho & hiển thị modal mã
   const handleBookingConfirm = (bookingInfo) => {
-    setIsBookingOpen(false); // Đóng modal đặt chỗ
-    
-    // Sinh mã nhận hàng 6 ký tự ngẫu nhiên để test giao diện
+    setIsBookingOpen(false);
+
+    if (food.quantity <= 0) {
+      alert('Rất tiếc! Suất ăn này vừa có khách hàng khác nhanh tay đặt trước.');
+      return;
+    }
+
+    const qty = bookingInfo.selectedQuantity || 1;
+
+    setFoodList((prev) =>
+      prev.map((item) =>
+        item.id === food.id
+          ? { ...item, quantity: Math.max(0, item.quantity - qty) }
+          : item
+      )
+    );
+
     const mockCode = 'LB-' + Math.floor(1000 + Math.random() * 9000);
-    
-    // Đồng bộ đầy đủ các trường dữ liệu để PickupSuccessModal hiển thị chuẩn xác
+
     setPickupCodeData({
       ...bookingInfo,
       pickupCode: mockCode,
@@ -119,14 +140,14 @@ export default function FoodDetailPage() {
       storeAddress: `${food.storeName} - ${food.address}`,
       address: `${food.storeName} - ${food.address}`,
       title: food.title,
-      selectedQuantity: bookingInfo.selectedQuantity || 1,
-      totalPrice: bookingInfo.totalPrice || food.discountPrice
+      selectedQuantity: qty,
+      totalPrice: bookingInfo.totalPrice || food.discountPrice * qty
     });
   };
 
   return (
     <div className="space-y-6">
-      {/* 1. Breadcrumb rút gọn: Trang chủ > Tên món */}
+      {/* 1. Breadcrumb: Trang chủ > Tên món */}
       <nav className="flex items-center gap-2 text-sm text-[#6B7280]">
         <Link to="/foods" className="hover:text-[#2563EB] transition-colors">
           Trang chủ
@@ -139,9 +160,8 @@ export default function FoodDetailPage() {
 
       {/* 2. Bố cục 2 cột chuẩn Figma Frame 3 (60% Trái - 40% Phải) */}
       <div className="flex flex-col lg:flex-row gap-8 items-start">
-        {/* CỘT TRÁI (60%): Ảnh lớn và Các khối thông tin chi tiết */}
+        {/* CỘT TRÁI (60%) */}
         <div className="w-full lg:w-[60%] space-y-6">
-          {/* Ảnh món ăn */}
           <div className="w-full h-[360px] sm:h-[400px] rounded-2xl overflow-hidden border border-[#E5E7EB] bg-gray-100 shadow-sm">
             <img
               src={food.imageUrl}
@@ -150,7 +170,6 @@ export default function FoodDetailPage() {
             />
           </div>
 
-          {/* Thẻ 1: Thông tin suất ăn (Mô tả tự do không theo khuôn mẫu) */}
           <div className="bg-white p-6 rounded-2xl border border-[#E5E7EB] shadow-sm space-y-3">
             <h2 className="text-xl font-bold text-[#111827]">Thông tin suất ăn</h2>
             <p className="text-sm text-[#4B5563] leading-relaxed whitespace-pre-line">
@@ -158,7 +177,6 @@ export default function FoodDetailPage() {
             </p>
           </div>
 
-          {/* Thẻ 2: Thông tin quán (Đã bỏ khung bản đồ) */}
           <div className="bg-white p-6 rounded-2xl border border-[#E5E7EB] shadow-sm space-y-3">
             <h2 className="text-xl font-bold text-[#111827]">Thông tin quán</h2>
             <p className="text-base font-bold text-[#111827]">{food.storeName}</p>
@@ -176,26 +194,32 @@ export default function FoodDetailPage() {
           </div>
         </div>
 
-        {/* CỘT PHẢI (40%): Thẻ sticky đặt chỗ cố định */}
+        {/* CỘT PHẢI (40%): Sticky Card */}
         <div className="w-full lg:w-[40%] sticky top-28">
           <div className="bg-white p-7 rounded-2xl border border-[#E5E7EB] shadow-md space-y-5">
-            {/* Tên món */}
             <h1 className="text-2xl font-bold text-[#111827] leading-snug">
               {food.title}
             </h1>
 
-            {/* Số lượng suất & Khung giờ nhận */}
+            {/* Badge số lượng & Khung giờ nhận */}
             <div className="flex items-center gap-3">
-              <span className="px-2.5 py-1 text-xs font-semibold rounded bg-[#DC2626] text-white">
-                Còn {food.quantity} suất
-              </span>
+              {isOutOfStock ? (
+                <span className="px-2.5 py-1 text-xs font-semibold rounded bg-gray-200 text-gray-600">
+                  Đã hết suất
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 text-xs font-semibold rounded bg-[#DC2626] text-white">
+                  Còn {food.quantity} suất
+                </span>
+              )}
+
               <span className="text-sm text-[#4B5563] flex items-center gap-1.5">
                 <span>🕒</span>
                 <span>Hôm nay: {food.pickupTimeRange}</span>
               </span>
             </div>
 
-            {/* Mức giá & % Giảm theo Figma */}
+            {/* Cụm giá tiền */}
             <div className="flex items-baseline gap-3 pt-1">
               <span className="text-3xl font-bold text-[#2563EB]">
                 {food.discountPrice.toLocaleString('vi-VN')}đ
@@ -208,24 +232,33 @@ export default function FoodDetailPage() {
               </span>
             </div>
 
-            {/* Cảnh báo thanh toán trực tiếp tại quầy */}
             <p className="text-xs text-[#DC2626] leading-relaxed font-medium">
               ⚠️ Lưu ý: Thanh toán trực tiếp tại quầy bằng tiền mặt hoặc quét mã QR khi nhận đồ. Không thu tiền online.
             </p>
 
-            {/* Nút Đặt chỗ */}
-            <button
-              type="button"
-              onClick={() => setIsBookingOpen(true)}
-              className="w-full py-3.5 px-4 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm rounded-xl shadow transition duration-150 cursor-pointer"
-            >
-              ĐẶT CHỖ NGAY
-            </button>
+            {/* Nút hành động */}
+            {isOutOfStock ? (
+              <button
+                type="button"
+                disabled
+                className="w-full py-3.5 px-4 bg-gray-200 text-gray-400 font-bold text-sm rounded-xl cursor-not-allowed text-center uppercase tracking-wide"
+              >
+                HẾT SUẤT HÔM NAY
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleOpenBooking}
+                className="w-full py-3.5 px-4 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm rounded-xl shadow transition duration-150 cursor-pointer"
+              >
+                ĐẶT CHỖ NGAY
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Frame 4: Modal Xác nhận đặt giữ chỗ */}
+      {/* Frame 4 Modal */}
       {isBookingOpen && (
         <BookingModal
           item={food}
@@ -235,7 +268,7 @@ export default function FoodDetailPage() {
         />
       )}
 
-      {/* Frame 5: Modal Mã nhận hàng 6 ký tự */}
+      {/* Frame 5 Modal */}
       {pickupCodeData && (
         <PickupSuccessModal
           isOpen={Boolean(pickupCodeData)}
