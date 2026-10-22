@@ -1,9 +1,10 @@
 // client/src/App.jsx
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom'; // Thêm Link ở đây
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthPage from './pages/auth/AuthPage';
-import ListingList from './components/store/ListingList'; // <-- Code của bạn được giữ lại ở đây
+import ListingList from './components/store/ListingList'; 
+import StoreOrders from './components/store/StoreOrders'; // <-- Import file mới của bạn
 
 // Component bảo vệ Route: Chưa đăng nhập thì bắt chuyển về /auth
 function ProtectedRoute({ children }) {
@@ -45,6 +46,22 @@ function HomePage() {
           ✓ Bạn đã đăng nhập vào hệ thống thành công.
         </p>
 
+        {/* THÊM MENU ĐIỀU HƯỚNG DÀNH CHO CHỦ QUÁN */}
+        <div className="flex flex-col gap-3 py-4 border-t border-b border-gray-100 my-4">
+          <Link 
+            to="/store/listings" 
+            className="w-full py-2.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-sm font-semibold hover:bg-blue-100 transition"
+          >
+            📋 Quản lý Tin đăng (Món ăn)
+          </Link>
+          <Link 
+            to="/store/orders" 
+            className="w-full py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-sm font-semibold hover:bg-emerald-100 transition"
+          >
+            📦 Quản lý Đơn hàng & Xác nhận
+          </Link>
+        </div>
+
         <button
           onClick={logout}
           className="w-full py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition cursor-pointer"
@@ -83,6 +100,18 @@ export default function App() {
               <ProtectedRoute>
                 <div className="min-h-screen bg-gray-50">
                   <ListingList />
+                </div>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Trang Quản lý Đơn hàng (Của Ngọc TV3) - Yêu cầu đăng nhập */}
+          <Route
+            path="/store/orders"
+            element={
+              <ProtectedRoute>
+                <div className="min-h-screen bg-gray-50">
+                  <StoreOrders />
                 </div>
               </ProtectedRoute>
             }
