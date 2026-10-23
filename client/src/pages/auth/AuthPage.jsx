@@ -1,7 +1,8 @@
 // client/src/pages/auth/AuthPage.jsx
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { homePathForRole } from '../../routes/ProtectedRoute';
 import { Button, Input } from '../../components/common';
 
 // 1. Biểu thức phát hiện ký tự tiếng Việt có dấu
@@ -11,11 +12,17 @@ const VIETNAMESE_DIACRITICS_REGEX =
 // 2. Biểu thức Regex Email chuẩn quốc tế (chỉ chứa chữ cái không dấu a-z, chữ số 0-9, dấu chấm/gạch)
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-// 3. Biểu thức Regex Số điện thoại Việt Nam (10 số, bắt đầu bằng 0 hoặc +84)
-const PHONE_REGEX = /^(0|\+84)(3|5|7|8|9)[0-9]{8}$/;
+// 3. Số điện thoại: 9 đến 11 chữ số (đúng quy tắc của server, docs/api.md mục 3.2).
+//    Người dùng gõ "+84 901 234 567" hoặc "0901.234.567" đều được: bỏ dấu cách/chấm/gạch, đổi +84 thành 0.
+const PHONE_REGEX = /^\d{9,11}$/;
+const normalizePhone = (value) => {
+  const compact = value.replace(/[\s.\-()]/g, '');
+  return compact.startsWith('+84') ? `0${compact.slice(3)}` : compact;
+};
 
 export default function AuthPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, register } = useAuth();
 
   // Tab hiện tại: 'login' (Đăng nhập) hoặc 'register' (Đăng ký)
@@ -24,10 +31,13 @@ export default function AuthPage() {
   // Dữ liệu biểu mẫu
   const [formData, setFormData] = useState({
     fullName: '',
-    emailOrPhone: '',
+    email: '',
+    phone: '',
+    role: 'buyer', // 'buyer' (Người mua) hoặc 'store' (Cửa hàng)
     password: '',
     confirmPassword: '',
   });
+  const [showForgotNotice, setShowForgotNotice] = useState(false);
 
   // Trạng thái xử lý và thông báo lỗi
   const [loading, setLoading] = useState(false);
@@ -53,45 +63,54 @@ export default function AuthPage() {
     setTab(newTab);
     setErrorMessage('');
     setFieldErrors({});
+    setShowForgotNotice(false);
   };
 
   // Kiểm tra tính hợp lệ dữ liệu chặt chẽ phía Client trước khi gửi API
   const validateForm = () => {
     const errors = {};
-    const cleanInput = formData.emailOrPhone.trim();
+    const cleanEmail = formData.email.trim();
 
-    // 1. Kiểm tra Họ tên (chỉ khi Đăng ký)
+    // 1. Kiểm tra Họ tên (chỉ khi Đăng ký): 2 đến 100 ký tự
     if (tab === 'register') {
-      if (!formData.fullName.trim()) {
+      const name = formData.fullName.trim();
+      if (!name) {
         errors.fullName = 'Vui lòng nhập họ và tên của bạn.';
+      } else if (name.length < 2 || name.length > 100) {
+        errors.fullName = 'Họ và tên phải từ 2 đến 100 ký tự.';
       }
     }
 
-    // 2. Kiểm tra Email hoặc Số điện thoại
-    if (!cleanInput) {
-      errors.emailOrPhone = 'Vui lòng nhập Email hoặc Số điện thoại.';
-    } else if (VIETNAMESE_DIACRITICS_REGEX.test(cleanInput)) {
-      errors.emailOrPhone = 'Email hoặc Số điện thoại không được chứa dấu tiếng Việt.';
-    } else if (cleanInput.includes(' ')) {
-      errors.emailOrPhone = 'Email hoặc Số điện thoại không được chứa khoảng trắng.';
-    } else {
-      const isEmail = EMAIL_REGEX.test(cleanInput);
-      const isPhone = PHONE_REGEX.test(cleanInput);
-      if (!isEmail && !isPhone) {
-        errors.emailOrPhone = 'Email hoặc Số điện thoại không đúng định dạng (vd: user@gmail.com hoặc 0987654321).';
+    // 2. Kiểm tra Email (server đăng nhập bằng email)
+    if (!cleanEmail) {
+      errors.email = 'Vui lòng nhập Email.';
+    } else if (VIETNAMESE_DIACRITICS_REGEX.test(cleanEmail)) {
+      errors.email = 'Email không được chứa dấu tiếng Việt.';
+    } else if (cleanEmail.includes(' ')) {
+      errors.email = 'Email không được chứa khoảng trắng.';
+    } else if (!EMAIL_REGEX.test(cleanEmail) || cleanEmail.length > 150) {
+      errors.email = 'Email không đúng định dạng (vd: user@gmail.com).';
+    }
+
+    // 3. Số điện thoại (chỉ khi Đăng ký, không bắt buộc)
+    if (tab === 'register' && formData.phone.trim()) {
+      if (!PHONE_REGEX.test(normalizePhone(formData.phone.trim()))) {
+        errors.phone = 'Số điện thoại phải gồm 9 đến 11 chữ số (vd: 0987654321).';
       }
     }
 
-    // 3. Kiểm tra Mật khẩu
+    // 4. Kiểm tra Mật khẩu: 6 đến 72 ký tự
     if (!formData.password) {
       errors.password = 'Vui lòng nhập mật khẩu.';
     } else if (formData.password.length < 6) {
       errors.password = 'Mật khẩu phải chứa ít nhất 6 ký tự.';
+    } else if (formData.password.length > 72) {
+      errors.password = 'Mật khẩu tối đa 72 ký tự.';
     } else if (VIETNAMESE_DIACRITICS_REGEX.test(formData.password)) {
       errors.password = 'Mật khẩu không được chứa dấu tiếng Việt. Vui lòng nhập lại.';
     }
 
-    // 4. Kiểm tra Xác nhận mật khẩu (chỉ khi Đăng ký)
+    // 5. Kiểm tra Xác nhận mật khẩu (chỉ khi Đăng ký)
     if (tab === 'register') {
       if (!formData.confirmPassword) {
         errors.confirmPassword = 'Vui lòng nhập lại mật khẩu xác nhận.';
@@ -114,23 +133,26 @@ export default function AuthPage() {
 
     setLoading(true);
     try {
-      const cleanInput = formData.emailOrPhone.trim();
+      const cleanEmail = formData.email.trim().toLowerCase();
+      let user;
       if (tab === 'login') {
-        await login({
-          emailOrPhone: cleanInput,
+        user = await login({
+          email: cleanEmail,
           password: formData.password,
         });
       } else {
-        await register({
+        const phone = formData.phone.trim() ? normalizePhone(formData.phone.trim()) : undefined;
+        user = await register({
           name: formData.fullName.trim(),
-          emailOrPhone: cleanInput,
+          email: cleanEmail,
           password: formData.password,
-          role: 'buyer', // Mặc định là tài khoản Người mua
+          ...(phone ? { phone } : {}),
+          role: formData.role, // 'buyer' hoặc 'store'
         });
       }
 
-      // Đăng nhập / Đăng ký thành công -> điều hướng về Trang chủ
-      navigate('/');
+      // Đăng nhập / Đăng ký thành công -> quay lại trang đang xem dở, hoặc về trang chủ theo vai trò
+      navigate(location.state?.from || homePathForRole(user.role), { replace: true });
     } catch (err) {
       setErrorMessage(err.message || 'Thao tác không thành công, vui lòng thử lại sau.');
     } finally {
@@ -201,16 +223,60 @@ export default function AuthPage() {
             />
           )}
 
-          {/* Ô Email hoặc Số điện thoại */}
+          {/* Ô Email (đăng nhập bằng email) */}
           <Input
-            label="Email hoặc Số điện thoại"
-            id="emailOrPhone"
-            name="emailOrPhone"
-            placeholder="Nhập email hoặc SĐT..."
-            value={formData.emailOrPhone}
+            label="Email"
+            id="email"
+            name="email"
+            placeholder="Nhập email..."
+            value={formData.email}
             onChange={handleChange}
-            error={fieldErrors.emailOrPhone}
+            error={fieldErrors.email}
           />
+
+          {/* Ô Số điện thoại (Chỉ hiển thị khi Đăng ký, không bắt buộc) */}
+          {tab === 'register' && (
+            <Input
+              label="Số điện thoại (không bắt buộc)"
+              id="phone"
+              name="phone"
+              placeholder="VD: 0987654321"
+              value={formData.phone}
+              onChange={handleChange}
+              error={fieldErrors.phone}
+            />
+          )}
+
+          {/* Chọn loại tài khoản (Chỉ hiển thị khi Đăng ký) */}
+          {tab === 'register' && (
+            <div className="space-y-1.5">
+              <span className="text-sm font-semibold text-[#111827]">Bạn đăng ký với tư cách</span>
+              <div className="h-11 w-full bg-[#F3F4F6] p-1 rounded-lg flex items-center gap-1 select-none">
+                {[
+                  { value: 'buyer', label: 'Người mua' },
+                  { value: 'store', label: 'Cửa hàng' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, role: option.value }))}
+                    className={`flex-1 h-full rounded-md text-sm font-semibold transition-all duration-150 cursor-pointer ${
+                      formData.role === option.value
+                        ? 'bg-white text-[#111827] shadow-sm'
+                        : 'text-[#6B7280] hover:text-[#111827]'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {formData.role === 'store' && (
+                <p className="text-xs text-[#6B7280]">
+                  Sau khi đăng ký bạn điền thông tin cửa hàng và chờ admin duyệt trước khi đăng món.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Ô Mật khẩu */}
           <Input
@@ -243,13 +309,16 @@ export default function AuthPage() {
             <div className="text-right">
               <button
                 type="button"
-                onClick={() =>
-                  alert('Vui lòng liên hệ quản trị viên qua email admin@lastbite.vn để được hỗ trợ cấp lại mật khẩu.')
-                }
+                onClick={() => setShowForgotNotice((prev) => !prev)}
                 className="text-[13px] text-[#2563EB] hover:underline cursor-pointer"
               >
                 Quên mật khẩu?
               </button>
+            </div>
+          )}
+          {tab === 'login' && showForgotNotice && (
+            <div className="p-3 bg-blue-50 border border-blue-100 text-blue-900 rounded-lg text-xs leading-relaxed">
+              Vui lòng liên hệ quản trị viên qua email admin@lastbite.vn để được hỗ trợ cấp lại mật khẩu.
             </div>
           )}
 
@@ -297,4 +366,4 @@ export default function AuthPage() {
       </div>
     </div>
   );
-}
+}

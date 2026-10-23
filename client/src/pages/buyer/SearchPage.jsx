@@ -1,175 +1,164 @@
 // client/src/pages/buyer/SearchPage.jsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  SearchBar, 
-  SortDropdown, 
-  FilterSidebar, 
-  FoodCard, 
-  BookingModal, 
-  PickupSuccessModal 
+import {
+  SearchBar,
+  SortDropdown,
+  FilterSidebar,
+  FoodCard,
+  BookingModal,
+  PickupSuccessModal,
+  Pagination
 } from '../../components/common';
+import { useAuth } from '../../context/AuthContext';
+import { listingApi } from '../../api/listingApi';
+import { categoryApi } from '../../api/categoryApi';
+import { orderApi } from '../../api/orderApi';
+import { toFoodItem, toPickupModalData } from '../../utils/mappers';
+import { isoTime } from '../../utils/format';
 
-// Dữ liệu chuẩn khớp 100% với FilterSidebar và FoodDetailPage
-const MOCK_FOODS = [
-  {
-    id: 1,
-    title: 'Cơm gà xối mỡ sốt cay',
-    storeName: 'Cơm Gà Bà Năm',
-    address: '123 Chùa Láng, Đống Đa, Hà Nội',
-    originalPrice: 45000,
-    discountPrice: 20000,
-    quantity: 3,
-    pickupTimeRange: '20:30 - 21:30',
-    category: 'com',
-    timeSlot: 'late',
-    imageUrl: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=500&auto=format&fit=crop&q=60'
-  },
-  {
-    id: 2,
-    title: 'Bánh mì pate trứng chả',
-    storeName: 'Bánh Mì Phố Cổ',
-    address: '45 Cầu Giấy, Quan Hoa, Cầu Giấy, Hà Nội',
-    originalPrice: 35000,
-    discountPrice: 15000,
-    quantity: 5,
-    pickupTimeRange: '12:00 - 13:00',
-    category: 'banhmi',
-    timeSlot: 'lunch',
-    imageUrl: 'https://images.unsplash.com/photo-1626804475297-41608ea09aeb?w=500&auto=format&fit=crop&q=60'
-  },
-  {
-    id: 3,
-    title: 'Bún bò Huế đặc biệt',
-    storeName: 'Bún Bò O Trâm',
-    address: '88 Nguyễn Trãi, Thượng Đình, Thanh Xuân, Hà Nội',
-    originalPrice: 50000,
-    discountPrice: 25000,
-    quantity: 2,
-    pickupTimeRange: '19:00 - 20:00',
-    category: 'bunpho',
-    timeSlot: 'evening',
-    imageUrl: 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=500&auto=format&fit=crop&q=60'
-  },
-  {
-    id: 4,
-    title: 'Trà sữa Oolong kem trứng',
-    storeName: 'Trà Sữa Nhà Bông',
-    address: '15 Đại Cồ Việt, Hai Bà Trưng, Hà Nội',
-    originalPrice: 40000,
-    discountPrice: 18000,
-    quantity: 4,
-    pickupTimeRange: '21:00 - 22:00',
-    category: 'trasua',
-    timeSlot: 'late',
-    imageUrl: 'https://images.unsplash.com/photo-1558857563-b371a5c60205?w=500&auto=format&fit=crop&q=60'
-  },
-  {
-    id: 5,
-    title: 'Cơm sườn bì chả nướng than',
-    storeName: 'Cơm Tấm 1989',
-    address: '10 Kim Mã, Ba Đình, Hà Nội',
-    originalPrice: 55000,
-    discountPrice: 25000,
-    quantity: 1,
-    pickupTimeRange: '12:30 - 13:30',
-    category: 'com',
-    timeSlot: 'lunch',
-    imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=60'
-  },
-  {
-    id: 6,
-    title: 'Nem chua rán nướng hồ tây',
-    storeName: 'Ăn Vặt Cô Béo',
-    address: '22 Trích Sài, Tây Hồ, Hà Nội',
-    originalPrice: 30000,
-    discountPrice: 12000,
-    quantity: 6,
-    pickupTimeRange: '18:30 - 19:30',
-    category: 'doanvat',
-    timeSlot: 'evening',
-    imageUrl: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=500&auto=format&fit=crop&q=60'
-  }
-];
+const PAGE_SIZE = 12;
+
+// Khung giờ nhận trong bộ lọc: tin được giữ lại khi khung giờ nhận của tin GIAO với khung giờ này.
+const TIME_SLOTS = {
+  lunch: ['11:00', '13:30'],
+  evening: ['18:00', '20:00'],
+  late: ['20:00', '24:00']
+};
+
+// Khoảng giá trong bộ lọc -> tham số min_price / max_price của GET /listings (tính theo giá cứu)
+const PRICE_PARAMS = {
+  under20: { max_price: 19999 },
+  '20to40': { min_price: 20000, max_price: 40000 },
+  over40: { min_price: 40001 }
+};
+
+const EMPTY_FILTERS = { categories: [], priceRange: 'all', pickupTimes: [] };
 
 export default function SearchPage() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
   const [keyword, setKeyword] = useState('');
   const [sortBy, setSortBy] = useState('newest');
-  const [filters, setFilters] = useState({
-    categories: [],
-    priceRange: 'all',
-    pickupTimes: []
-  });
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [page, setPage] = useState(1);
+
+  // Dữ liệu thật từ server
+  const [foods, setFoods] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0); // tăng lên để tải lại danh sách (sau khi đặt chỗ)
+  const [categoryOptions, setCategoryOptions] = useState([]);
 
   const [selectedItem, setSelectedItem] = useState(null);
   const [pickupCodeData, setPickupCodeData] = useState(null);
+  const [bookingBusy, setBookingBusy] = useState(false);
+  const [bookingError, setBookingError] = useState('');
+
+  // Loại món lấy từ server (GET /categories) cho bộ lọc
+  useEffect(() => {
+    categoryApi
+      .getCategories()
+      .then((res) => setCategoryOptions(res.data.map((c) => ({ id: c.id, label: c.name }))))
+      .catch(() => {}); // lỗi thì FilterSidebar dùng danh sách mẫu
+  }, []);
+
+  // Tải các suất đang bán. Từ khóa và khoảng giá lọc ngay ở server; loại món, khung giờ (chọn nhiều ô)
+  // và sắp xếp xử lý ở trình duyệt trên tối đa 50 suất đã tải (đủ cho quy mô bài tập lớn).
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      setLoadError('');
+      try {
+        const params = { limit: 50, ...(PRICE_PARAMS[filters.priceRange] || {}) };
+        if (keyword.trim()) params.q = keyword.trim();
+        const res = await listingApi.getListings(params);
+        if (!cancelled) setFoods(res.data.map(toFoodItem));
+      } catch (err) {
+        if (!cancelled) {
+          setFoods([]);
+          setLoadError(err.message);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, keyword ? 350 : 0); // đợi người dùng gõ xong mới gọi server
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [keyword, filters.priceRange, reloadKey]);
+
+  // Đổi bộ lọc / từ khóa / cách sắp xếp thì quay về trang 1
+  useEffect(() => {
+    setPage(1);
+  }, [keyword, filters, sortBy]);
 
   // Logic lọc và sắp xếp
   const processedFoods = useMemo(() => {
-    let result = [...MOCK_FOODS];
+    let result = [...foods];
 
-    // 1. Lọc từ khóa
-    if (keyword.trim()) {
-      const q = keyword.toLowerCase().trim();
-      result = result.filter(
-        (item) =>
-          item.title.toLowerCase().includes(q) ||
-          item.storeName.toLowerCase().includes(q) ||
-          item.address.toLowerCase().includes(q)
+    // 1. Lọc danh mục
+    if (filters.categories && filters.categories.length > 0) {
+      result = result.filter((item) => filters.categories.includes(item.categoryId));
+    }
+
+    // 2. Lọc khung giờ nhận
+    if (filters.pickupTimes && filters.pickupTimes.length > 0) {
+      result = result.filter((item) =>
+        filters.pickupTimes.some((slotId) => {
+          const [slotStart, slotEnd] = TIME_SLOTS[slotId] || [];
+          return isoTime(item.pickupStart) < slotEnd && isoTime(item.pickupEnd) > slotStart;
+        })
       );
     }
 
-    // 2. Lọc danh mục
-    if (filters.categories && filters.categories.length > 0) {
-      result = result.filter((item) => filters.categories.includes(item.category));
-    }
-
-    // 3. Lọc khoảng giá
-    if (filters.priceRange && filters.priceRange !== 'all') {
-      if (filters.priceRange === 'under20') {
-        result = result.filter((item) => item.discountPrice < 20000);
-      } else if (filters.priceRange === '20to40') {
-        result = result.filter((item) => item.discountPrice >= 20000 && item.discountPrice <= 40000);
-      } else if (filters.priceRange === 'over40') {
-        result = result.filter((item) => item.discountPrice > 40000);
-      }
-    }
-
-    // 4. Lọc khung giờ nhận
-    if (filters.pickupTimes && filters.pickupTimes.length > 0) {
-      result = result.filter((item) => filters.pickupTimes.includes(item.timeSlot));
-    }
-
-    // 5. Sắp xếp
+    // 3. Sắp xếp
     if (sortBy === 'price_asc') {
       result.sort((a, b) => a.discountPrice - b.discountPrice);
     } else if (sortBy === 'price_desc') {
       result.sort((a, b) => b.discountPrice - a.discountPrice);
     } else if (sortBy === 'discount_desc') {
       result.sort((a, b) => (b.originalPrice - b.discountPrice) - (a.originalPrice - a.discountPrice));
+    } else {
+      // newest: tin đăng mới nhất lên đầu
+      result.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : b.id - a.id));
     }
 
     return result;
-  }, [keyword, filters, sortBy]);
+  }, [foods, filters, sortBy]);
 
-  // Xử lý khi xác nhận đặt chỗ: sinh mã và đồng bộ dữ liệu vào modal thành công
-  const handleBookingConfirm = (bookingInfo) => {
-    const mockPickupCode = 'LB-' + Math.floor(1000 + Math.random() * 9000);
+  const totalPages = Math.max(1, Math.ceil(processedFoods.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageItems = processedFoods.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-    setPickupCodeData({
-      ...bookingInfo,
-      pickupCode: mockPickupCode,
-      code: mockPickupCode,
-      pickupTimeRange: selectedItem.pickupTimeRange,
-      storeAddress: `${selectedItem.storeName} - ${selectedItem.address}`,
-      address: `${selectedItem.storeName} - ${selectedItem.address}`,
-      title: selectedItem.title,
-      selectedQuantity: bookingInfo.selectedQuantity || 1,
-      totalPrice: bookingInfo.totalPrice || selectedItem.discountPrice
-    });
+  // Bấm "Đặt chỗ": chưa đăng nhập thì chuyển sang trang đăng nhập
+  const handleBookNow = (item) => {
+    if (!isAuthenticated) {
+      navigate('/auth', { state: { from: '/foods' } });
+      return;
+    }
+    setBookingError('');
+    setSelectedItem(item);
+  };
 
-    setSelectedItem(null); // Đóng BookingModal
+  // Xử lý khi xác nhận đặt chỗ: gọi POST /orders, nhận mã 6 ký tự từ server rồi hiện modal thành công
+  const handleBookingConfirm = async (bookingInfo) => {
+    setBookingBusy(true);
+    setBookingError('');
+    try {
+      const res = await orderApi.createOrder(selectedItem.id, bookingInfo.selectedQuantity || 1);
+      setPickupCodeData(toPickupModalData(res.data));
+      setSelectedItem(null); // Đóng BookingModal
+      setReloadKey((k) => k + 1); // cập nhật lại số suất còn lại
+    } catch (err) {
+      setBookingError(err.message);
+      if (err.status === 409) setReloadKey((k) => k + 1); // hết suất / hết giờ: làm mới danh sách
+    } finally {
+      setBookingBusy(false);
+    }
   };
 
   return (
@@ -177,8 +166,9 @@ export default function SearchPage() {
       {/* CỘT TRÁI: SIDEBAR BỘ LỌC */}
       <aside className="w-full lg:w-[280px] shrink-0 sticky top-28">
         <FilterSidebar
+          categoryOptions={categoryOptions}
           onApplyFilter={(receivedFilters) => setFilters(receivedFilters)}
-          onResetFilter={() => setFilters({ categories: [], priceRange: 'all', pickupTimes: [] })}
+          onResetFilter={() => setFilters(EMPTY_FILTERS)}
         />
       </aside>
 
@@ -198,22 +188,43 @@ export default function SearchPage() {
           </div>
         </div>
 
-        {processedFoods.length === 0 ? (
+        {loading ? (
+          <div className="bg-white p-12 text-center rounded-xl border border-[#E5E7EB]">
+            <p className="text-sm text-gray-500">Đang tải danh sách suất ăn...</p>
+          </div>
+        ) : loadError ? (
+          <div className="bg-white p-12 text-center rounded-xl border border-red-200 space-y-3">
+            <p className="text-base font-semibold text-red-600">Không tải được danh sách suất ăn</p>
+            <p className="text-xs text-gray-500">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => setReloadKey((k) => k + 1)}
+              className="px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-lg cursor-pointer"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : processedFoods.length === 0 ? (
           <div className="bg-white p-12 text-center rounded-xl border border-[#E5E7EB] space-y-2">
             <p className="text-base font-semibold text-gray-700">Không tìm thấy suất ăn nào phù hợp</p>
             <p className="text-xs text-gray-400">Hãy thử bỏ bớt tiêu chí lọc hoặc đổi từ khóa tìm kiếm.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-            {processedFoods.map((item) => (
-              <FoodCard
-                key={item.id}
-                item={item}
-                onCardClick={(f) => navigate(`/foods/${f.id}`)}
-                onBookNow={(f) => setSelectedItem(f)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+              {pageItems.map((item) => (
+                <FoodCard
+                  key={item.id}
+                  item={item}
+                  onCardClick={(f) => navigate(`/foods/${f.id}`)}
+                  onBookNow={handleBookNow}
+                />
+              ))}
+            </div>
+            {totalPages > 1 && (
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setPage} />
+            )}
+          </>
         )}
       </section>
 
@@ -222,7 +233,9 @@ export default function SearchPage() {
         <BookingModal
           item={selectedItem}
           isOpen={Boolean(selectedItem)}
-          onClose={() => setSelectedItem(null)}
+          isSubmitting={bookingBusy}
+          errorMessage={bookingError}
+          onClose={() => !bookingBusy && setSelectedItem(null)}
           onConfirm={handleBookingConfirm}
         />
       )}

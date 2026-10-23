@@ -1,6 +1,9 @@
 // client/src/pages/buyer/OrderHistoryPage.jsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { orderApi } from '../../api/orderApi';
+import { toOrderItem } from '../../utils/mappers';
+import { formatMoney, PLACEHOLDER_IMAGE } from '../../utils/format';
 
 // 5 Tab trạng thái theo đúng thiết kế Frame 6 trên Figma
 const TABS = [
@@ -11,41 +14,37 @@ const TABS = [
   { id: 'NO_SHOW', label: 'Không đến' }
 ];
 
-// Dữ liệu mẫu ban đầu đã nạp ảnh thật
-const INITIAL_ORDERS = [
-  {
-    id: 'LB-ORD-101',
-    code: 'LB-9482',
-    storeName: 'Quán Cơm Gà Bà Năm',
-    address: '123 Chùa Láng',
-    foodId: 1,
-    title: 'Cơm gà xối mỡ sốt cay',
-    quantity: 1,
-    pickupTime: '21:30 hôm nay',
-    totalPrice: 20000,
-    status: 'PENDING',
-    imageUrl: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=300&auto=format&fit=crop&q=80'
-  },
-  {
-    id: 'LB-ORD-102',
-    code: 'LB-4219',
-    storeName: 'Tiệm Bánh Mì Chảo 99',
-    address: '45 Chùa Láng',
-    foodId: 2,
-    title: 'Bánh mì chảo',
-    quantity: 1,
-    completedTime: '12:15 - 12/10/2026',
-    totalPrice: 35000,
-    status: 'COMPLETED',
-    imageUrl: 'https://images.unsplash.com/photo-1626804475297-41608ea09aeb?w=300&auto=format&fit=crop&q=80'
-  }
-];
-
 export default function OrderHistoryPage() {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState(INITIAL_ORDERS);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [activeTab, setActiveTab] = useState('ALL');
   const [orderToCancel, setOrderToCancel] = useState(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelError, setCancelError] = useState('');
+
+  // Tải lịch sử đơn của tôi từ server (GET /orders/my, mới nhất trước)
+  useEffect(() => {
+    let cancelled = false;
+    orderApi
+      .getMyOrders({ limit: 50 })
+      .then((res) => {
+        if (cancelled) return;
+        setOrders(res.data.map(toOrderItem));
+        setLoadError('');
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
   // Đếm số lượng đơn tương ứng cho từng tab
   const counts = useMemo(() => {
@@ -64,15 +63,26 @@ export default function OrderHistoryPage() {
     return orders.filter((o) => o.status === activeTab);
   }, [orders, activeTab]);
 
-  // Xử lý xác nhận HỦY ĐƠN
-  const handleConfirmCancel = () => {
+  // Xử lý xác nhận HỦY ĐƠN: gọi PATCH /orders/:id/cancel (server trả suất lại cho cửa hàng)
+  const handleConfirmCancel = async () => {
     if (!orderToCancel) return;
-    setOrders((prev) =>
-      prev.map((ord) =>
-        ord.id === orderToCancel.id ? { ...ord, status: 'CANCELLED' } : ord
-      )
-    );
+    setCancelBusy(true);
+    setCancelError('');
+    try {
+      await orderApi.cancelOrder(orderToCancel.id);
+      setOrderToCancel(null);
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      setCancelError(err.message); // ví dụ 409 "Đơn không thể huỷ" khi đã quá giờ nhận
+    } finally {
+      setCancelBusy(false);
+    }
+  };
+
+  const closeCancelModal = () => {
+    if (cancelBusy) return;
     setOrderToCancel(null);
+    setCancelError('');
   };
 
   return (
@@ -106,7 +116,23 @@ export default function OrderHistoryPage() {
 
       {/* 3. Lưới hiển thị 2 cột chuẩn Figma */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {filteredOrders.length === 0 ? (
+        {loading ? (
+          <div className="col-span-2 text-center py-12 text-sm text-[#6B7280] bg-white rounded-xl border border-[#E5E7EB]">
+            Đang tải đơn hàng...
+          </div>
+        ) : loadError ? (
+          <div className="col-span-2 text-center py-12 text-sm bg-white rounded-xl border border-red-200 space-y-3">
+            <p className="font-semibold text-red-600">Không tải được đơn hàng</p>
+            <p className="text-xs text-gray-500">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => { setLoading(true); setReloadKey((k) => k + 1); }}
+              className="px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-lg cursor-pointer"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : filteredOrders.length === 0 ? (
           <div className="col-span-2 text-center py-12 text-sm text-[#6B7280] bg-white rounded-xl border border-[#E5E7EB]">
             Không có đơn hàng nào trong mục này.
           </div>
@@ -118,7 +144,7 @@ export default function OrderHistoryPage() {
             return (
               <div
                 key={order.id}
-                className="bg-white rounded-xl border border-[#E5E7EB] p-5 flex flex-col justify-between shadow-xs"
+                className="bg-white rounded-xl border border-[#E5E7EB] p-5 flex flex-col justify-between shadow-sm"
               >
                 <div>
                   {/* Header thẻ: Tên quán & Địa chỉ • Badge trạng thái */}
@@ -156,8 +182,9 @@ export default function OrderHistoryPage() {
                   {/* Body thẻ: Ảnh thật sắc nét + Thông tin đơn hàng */}
                   <div className="flex gap-4 items-start mb-6">
                     <img
-                      src={order.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300&auto=format&fit=crop&q=80'}
+                      src={order.imageUrl}
                       alt={order.title}
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = PLACEHOLDER_IMAGE; }}
                       onClick={() => navigate(`/foods/${order.foodId}`)}
                       className="w-[72px] h-[72px] rounded-lg object-cover shrink-0 cursor-pointer hover:opacity-85 transition border border-[#E5E7EB] bg-gray-100"
                       title="Xem chi tiết món"
@@ -191,7 +218,7 @@ export default function OrderHistoryPage() {
                       <p className="text-[#4B5563]">
                         Tổng tiền:{' '}
                         <strong className="text-sm font-bold text-[#2563EB]">
-                          {order.totalPrice.toLocaleString('vi-VN')}đ
+                          {formatMoney(order.totalPrice)}
                         </strong>
                       </p>
                     </div>
@@ -226,7 +253,7 @@ export default function OrderHistoryPage() {
 
       {/* Modal xác nhận HỦY ĐƠN (Icon Vector SVG chuẩn nét) */}
       {orderToCancel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-xl border border-gray-100">
             {/* SVG Warning Icon */}
             <div className="w-12 h-12 rounded-full bg-red-50 text-[#DC2626] flex items-center justify-center mx-auto border border-red-100">
@@ -254,20 +281,28 @@ export default function OrderHistoryPage() {
               </p>
             </div>
 
+            {cancelError && (
+              <div className="p-2.5 bg-red-50 border border-red-200 text-red-600 rounded-lg text-xs font-medium">
+                ⚠️ {cancelError}
+              </div>
+            )}
+
             <div className="flex gap-2.5 pt-2">
               <button
                 type="button"
-                onClick={() => setOrderToCancel(null)}
-                className="flex-1 py-2.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition cursor-pointer"
+                onClick={closeCancelModal}
+                disabled={cancelBusy}
+                className="flex-1 py-2.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition cursor-pointer disabled:opacity-50"
               >
                 Giữ lại
               </button>
               <button
                 type="button"
                 onClick={handleConfirmCancel}
-                className="flex-1 py-2.5 text-xs font-bold text-white bg-[#DC2626] hover:bg-[#B91C1C] rounded-xl transition cursor-pointer shadow-sm"
+                disabled={cancelBusy}
+                className="flex-1 py-2.5 text-xs font-bold text-white bg-[#DC2626] hover:bg-[#B91C1C] rounded-xl transition cursor-pointer shadow-sm disabled:opacity-60"
               >
-                Xác nhận hủy
+                {cancelBusy ? 'Đang huỷ...' : 'Xác nhận hủy'}
               </button>
             </div>
           </div>
@@ -275,4 +310,4 @@ export default function OrderHistoryPage() {
       )}
     </div>
   );
-}
+}

@@ -37,6 +37,7 @@ export default function PickupSuccessModal({
         <PickupCode 
           code={bookingData.pickupCode || 'LB-9482'} 
           expireTime={expireTime} 
+          dayLabel={bookingData.pickupToday === false ? ` ngày ${bookingData.pickupDateLabel}` : ' hôm nay'}
         />
 
         {/* Danh sách tóm tắt thông tin nhận món */}
@@ -63,4 +64,4 @@ export default function PickupSuccessModal({
       </div>
     </Modal>
   );
-}
+}

@@ -1,51 +1,34 @@
-import axios from 'axios';
-
-// Cấu hình axios mặc định
-const apiClient = axios.create({
-  baseURL: 'http://localhost:5000/api', // Trỏ đúng về Backend của bạn
-});
-
-// Tự động đính kèm token của cửa hàng vào header nếu có
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// client/src/api/listingApi.js
+// Dùng chung axiosClient (cùng địa chỉ server VITE_API_URL, tự gắn token, tự đổi lỗi thành Error có message).
+// Mọi hàm trả về đúng phần thân phản hồi của server: { success, data, pagination? }.
+import axiosClient from './axiosClient';
 
 export const listingApi = {
-  // 1. Upload ảnh
-  uploadImage: async (file) => {
+  // --- Phía người mua (công khai) ---
+  // params: q, category_id, min_price, max_price, pickup_from, pickup_to, store_id, sort, page, limit
+  getListings: (params = {}) => axiosClient.get('/listings', { params }),
+
+  getListingById: (id) => axiosClient.get(`/listings/${id}`),
+
+  // --- Phía cửa hàng ---
+  // 1. Upload ảnh (JPG/PNG, tối đa 2MB)
+  uploadImage: (file) => {
     const formData = new FormData();
     formData.append('image', file);
-    const response = await apiClient.post('/uploads/image', formData, {
+    return axiosClient.post('/uploads/image', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
-    return response.data;
   },
 
-  // 2. Lấy danh sách món của cửa hàng đang đăng nhập
-  getMyListings: async () => {
-    const response = await apiClient.get('/stores/me/listings');
-    return response.data;
-  },
+  // 2. Lấy danh sách món của cửa hàng đang đăng nhập (server phân trang, tối đa 50 mỗi trang)
+  getMyListings: (params = { limit: 50 }) => axiosClient.get('/stores/me/listings', { params }),
 
   // 3. Đăng món mới
-  createListing: async (data) => {
-    const response = await apiClient.post('/listings', data);
-    return response.data;
-  },
+  createListing: (data) => axiosClient.post('/listings', data),
 
   // 4. Sửa món
-  updateListing: async (id, data) => {
-    const response = await apiClient.put(`/listings/${id}`, data);
-    return response.data;
-  },
+  updateListing: (id, data) => axiosClient.put(`/listings/${id}`, data),
 
   // 5. Xoá món
-  deleteListing: async (id) => {
-    const response = await apiClient.delete(`/listings/${id}`);
-    return response.data;
-  }
+  deleteListing: (id) => axiosClient.delete(`/listings/${id}`),
 };

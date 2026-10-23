@@ -3,12 +3,16 @@ import React, { useState } from 'react';
 import Modal from './Modal';
 import Button from './Button';
 
-export default function BookingModal({ isOpen, onClose, item, onConfirm }) {
+// Mỗi đơn đặt tối đa 5 suất (docs/api.md mục 3.8)
+const MAX_PER_ORDER = 5;
+
+// isSubmitting / errorMessage: trang cha truyền vào khi đang gọi API đặt chỗ (hiện vòng xoay và lỗi từ server).
+export default function BookingModal({ isOpen, onClose, item, onConfirm, isSubmitting = false, errorMessage = '' }) {
   const [quantity, setQuantity] = useState(1);
 
   if (!item) return null;
 
-  const maxQty = item.quantity || 3;
+  const maxQty = Math.min(item.quantity || 3, MAX_PER_ORDER);
   const totalPrice = item.discountPrice * quantity;
 
   const handleDecrease = () => {
@@ -71,18 +75,27 @@ export default function BookingModal({ isOpen, onClose, item, onConfirm }) {
 
         {/* Lưu ý nhận món[cite: 13] */}
         <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-900 leading-relaxed">
-          ℹ️ Vui lòng đến nhận hàng đúng khung giờ <strong>{item.pickupTimeRange}</strong>. Đơn hàng sẽ thanh toán trực tiếp tại quầy bằng tiền mặt hoặc chuyển khoản QR khi nhận đồ.
+          ℹ️ Vui lòng đến nhận hàng đúng khung giờ <strong>{item.pickupTimeRange}</strong>
+          {item.pickupToday === false && <> (ngày <strong>{item.pickupDateLabel}</strong>)</>}. Đơn hàng sẽ thanh toán trực tiếp tại quầy bằng tiền mặt hoặc chuyển khoản QR khi nhận đồ.
         </div>
+
+        {/* Lỗi từ server (hết suất, hết giờ nhận...) */}
+        {errorMessage && (
+          <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-xs font-medium">
+            ⚠️ {errorMessage}
+          </div>
+        )}
 
         {/* Cụm 2 nút chân modal[cite: 13] */}
         <div className="flex gap-3 pt-3 border-t border-[#E5E7EB]">
-          <Button variant="outline" size="md" className="flex-1" onClick={onClose}>
+          <Button variant="outline" size="md" className="flex-1" onClick={onClose} disabled={isSubmitting}>
             QUAY LẠI
           </Button>
           <Button 
             variant="primary" 
             size="md" 
             className="flex-1"
+            isLoading={isSubmitting}
             onClick={() => onConfirm({ ...item, selectedQuantity: quantity, totalPrice })}
           >
             XÁC NHẬN ĐẶT CHỖ
@@ -91,4 +104,4 @@ export default function BookingModal({ isOpen, onClose, item, onConfirm }) {
       </div>
     </Modal>
   );
-}
+}
