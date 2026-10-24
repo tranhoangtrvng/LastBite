@@ -1,4 +1,8 @@
-// Điểm khởi động: nạp biến môi trường, kiểm tra DB, mở cổng.
+// Điểm khởi động: đặt múi giờ, nạp biến môi trường, kiểm tra DB, mở cổng.
+
+// Đặt múi giờ Việt Nam cho Node.js. PHẢI nằm trên cùng, trước mọi dòng require khác.
+process.env.TZ = 'Asia/Ho_Chi_Minh';
+
 require('dotenv').config();
 
 const app = require('./app');

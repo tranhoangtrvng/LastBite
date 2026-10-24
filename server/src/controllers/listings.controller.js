@@ -120,4 +120,5 @@ const getListingById = asyncHandler(async (req, res) => {
   res.json({ success: true, data: formatListing(rows[0]) });
 });
 
-module.exports = { getListings, getListingById };
+// SELECT_LISTING được export để routes của cửa hàng (VT3) trả về đúng đối tượng Listing như API công khai.
+module.exports = { getListings, getListingById, SELECT_LISTING };

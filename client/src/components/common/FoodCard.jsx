@@ -1,6 +1,7 @@
 // src/components/common/FoodCard.jsx
 import React from 'react';
 import Badge from './Badge';
+import { PLACEHOLDER_IMAGE } from '../../utils/format';
 
 export default function FoodCard({ item, onBookNow, onCardClick }) {
   return (
@@ -13,6 +14,7 @@ export default function FoodCard({ item, onBookNow, onCardClick }) {
         <img
           src={item.imageUrl}
           alt={item.title}
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = PLACEHOLDER_IMAGE; }}
           className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
         />
         <div className="absolute top-2.5 left-2.5">
@@ -61,4 +63,4 @@ export default function FoodCard({ item, onBookNow, onCardClick }) {
       </div>
     </div>
   );
-}
+}

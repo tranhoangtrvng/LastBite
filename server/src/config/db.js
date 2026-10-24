@@ -3,6 +3,10 @@
 //   const pool = require('../config/db');
 //   const [rows] = await pool.query('SELECT * FROM listings WHERE id = ?', [id]);
 // Luôn truyền giá trị qua dấu ? để tránh SQL Injection.
+//
+// MÚI GIỜ: toàn bộ hệ thống dùng GIỜ VIỆT NAM (+07:00). Có hai chỗ cần đặt:
+//   1) option `timezone` của mysql2: cách Node đổi qua lại giữa Date <-> chuỗi DATETIME.
+//   2) lệnh SET time_zone cho từng kết nối MySQL: để NOW() trong câu SQL cũng là giờ Việt Nam.
 
 const mysql = require('mysql2/promise');
 
@@ -15,6 +19,14 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   charset: 'utf8mb4',
+  timezone: '+07:00',
+});
+
+// Mỗi khi pool mở một kết nối mới: đặt múi giờ của phiên làm việc đó là +07:00.
+pool.pool.on('connection', (connection) => {
+  connection.query("SET time_zone = '+07:00'", (err) => {
+    if (err) console.warn(`[DB] Không đặt được múi giờ +07:00: ${err.message}`);
+  });
 });
 
 // Kiểm tra kết nối khi khởi động (không làm sập server nếu DB chưa bật).

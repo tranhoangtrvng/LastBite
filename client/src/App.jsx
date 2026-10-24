@@ -1,124 +1,78 @@
 // client/src/App.jsx
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom'; // Thêm Link ở đây
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import BuyerLayout from './layouts/BuyerLayout';
+import StoreLayout from './layouts/StoreLayout';
+import ProtectedRoute from './routes/ProtectedRoute'; 
+
+// Phân hệ Xác thực
 import AuthPage from './pages/auth/AuthPage';
-import ListingList from './components/store/ListingList'; 
-import StoreOrders from './components/store/StoreOrders'; // <-- Import file mới của bạn
 
-// Component bảo vệ Route: Chưa đăng nhập thì bắt chuyển về /auth
-function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth();
+// Phân hệ Người mua
+import SearchPage from './pages/buyer/SearchPage';
+import FoodDetailPage from './pages/buyer/FoodDetailPage';
+import OrderHistoryPage from './pages/buyer/OrderHistoryPage';
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">
-        Đang tải...
-      </div>
-    );
-  }
+// Phân hệ Cửa hàng
+import StorePage from './pages/store/StorePage';
 
-  if (!isAuthenticated) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  return children;
-}
-
-// Trang chủ sau khi đăng nhập thành công
-function HomePage() {
-  const { user, logout } = useAuth();
-
-  return (
-    <div className="min-h-screen bg-[#F9FAFB] p-8 flex items-center justify-center">
-      <div className="max-w-md w-full bg-white p-8 rounded-xl border border-[#E5E7EB] text-center space-y-4 shadow-sm">
-        <h2 className="text-xl font-bold text-[#111827]">Trang chủ LastBite</h2>
-        
-        <p className="text-sm text-gray-600">
-          Xin chào,{' '}
-          <span className="font-bold text-[#2563EB]">
-            {user?.name || user?.emailOrPhone}
-          </span>
-          !
-        </p>
-        
-        <p className="text-xs text-emerald-600 bg-emerald-50 py-2 px-3 rounded-lg border border-emerald-200">
-          ✓ Bạn đã đăng nhập vào hệ thống thành công.
-        </p>
-
-        {/* THÊM MENU ĐIỀU HƯỚNG DÀNH CHO CHỦ QUÁN */}
-        <div className="flex flex-col gap-3 py-4 border-t border-b border-gray-100 my-4">
-          <Link 
-            to="/store/listings" 
-            className="w-full py-2.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-sm font-semibold hover:bg-blue-100 transition"
-          >
-            📋 Quản lý Tin đăng (Món ăn)
-          </Link>
-          <Link 
-            to="/store/orders" 
-            className="w-full py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-sm font-semibold hover:bg-emerald-100 transition"
-          >
-            📦 Quản lý Đơn hàng & Xác nhận
-          </Link>
-        </div>
-
-        <button
-          onClick={logout}
-          className="w-full py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition cursor-pointer"
-        >
-          Đăng xuất
-        </button>
-      </div>
-    </div>
-  );
-}
+// Component giữ chỗ cho Trang Hồ sơ cá nhân (Frame 7)
+const DummyProfile = () => (
+  <div className="bg-white p-8 rounded-2xl border border-[#E5E7EB] text-center max-w-2xl mx-auto space-y-3 shadow-sm">
+    <span className="inline-block p-3 bg-emerald-50 text-emerald-600 rounded-full text-xl font-bold">👤</span>
+    <h1 className="text-xl font-bold text-[#111827]">Hồ sơ cá nhân (Frame 7)</h1>
+    <p className="text-sm text-[#4B5563]">
+      Khu vực quản lý thông tin tài khoản cá nhân, cài đặt bảo mật và thống kê số suất ăn đã giải cứu.
+    </p>
+  </div>
+);
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Trang Đăng nhập / Đăng ký */}
+          {/* 1. Phân hệ Xác thực */}
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/login" element={<Navigate to="/auth" replace />} />
           <Route path="/register" element={<Navigate to="/auth" replace />} />
 
-          {/* Trang chủ yêu cầu phải đăng nhập */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <HomePage />
-              </ProtectedRoute>
-            }
-          />
+          {/* 2. Phân hệ Người mua (Dùng chung BuyerLayout có Header 80px & Footer) */}
+          <Route element={<BuyerLayout />}>
+            {/* Mặc định chuyển hướng sang danh sách món */}
+            <Route path="/" element={<Navigate to="/foods" replace />} />
 
-          {/* Trang Quản lý tin đăng của bạn - Yêu cầu đăng nhập */}
-          <Route
-            path="/store/listings"
-            element={
-              <ProtectedRoute>
-                <div className="min-h-screen bg-gray-50">
-                  <ListingList />
-                </div>
-              </ProtectedRoute>
-            }
-          />
+            {/* Trang Tìm kiếm món ăn (Frame 2) */}
+            <Route path="/foods" element={<SearchPage />} />
 
-          {/* Trang Quản lý Đơn hàng (Của Ngọc TV3) - Yêu cầu đăng nhập */}
-          <Route
-            path="/store/orders"
-            element={
-              <ProtectedRoute>
-                <div className="min-h-screen bg-gray-50">
-                  <StoreOrders />
-                </div>
-              </ProtectedRoute>
-            }
-          />
+            {/* Trang Chi tiết suất ăn (Frame 3) */}
+            <Route path="/foods/:id" element={<FoodDetailPage />} />
 
-          {/* Các đường dẫn không tồn tại đều chuyển về / */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Các trang cần đăng nhập (chưa đăng nhập -> chuyển về /auth) */}
+            <Route element={<ProtectedRoute />}>
+              {/* Trang Lịch sử đơn hàng (Frame 6): chỉ người mua */}
+              <Route element={<ProtectedRoute roles={['buyer']} />}>
+                <Route path="/orders" element={<OrderHistoryPage />} />
+              </Route>
+
+              {/* Trang Hồ sơ cá nhân (Frame 7) */}
+              <Route path="/profile" element={<DummyProfile />} />
+            </Route>
+          </Route>
+
+          {/* 3. Phân hệ Cửa hàng (chỉ tài khoản role = store) */}
+          <Route element={<ProtectedRoute roles={['store']} />}>
+            <Route element={<StoreLayout />}>
+              <Route path="/store" element={<StorePage />} />
+            </Route>
+          </Route>
+
+          {/* 4. Phân hệ Admin: giao diện do VT4 làm, hiện chưa có -> tạm đưa về trang chủ */}
+          <Route path="/admin/*" element={<Navigate to="/foods" replace />} />
+
+          {/* 5. Fallback cho các đường dẫn sai */}
+          <Route path="*" element={<Navigate to="/foods" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
