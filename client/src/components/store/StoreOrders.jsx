@@ -1,26 +1,26 @@
+// client/src/components/store/StoreOrders.jsx
 import React, { useState, useEffect } from 'react';
+import axiosClient from '../../api/axiosClient';
+import { formatMoney } from '../../utils/format';
 
-const StoreOrders = () => {
+export default function StoreOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // State lưu trữ mã xác nhận đang nhập cho từng đơn hàng (dùng order ID làm key)
+  const [activeTab, setActiveTab] = useState('ALL');
   const [pickupCodes, setPickupCodes] = useState({});
+  const [submittingId, setSubmittingId] = useState(null);
 
-  // 1. Lấy danh sách đơn hàng từ API
+  // 1. Tải danh sách đơn hàng của quán
   const fetchOrders = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/orders/store');
-      const result = await response.json();
-      
-      if (result.success) {
-        setOrders(result.data);
-      } else {
-        setError(result.message);
-      }
+      setLoading(true);
+      setError(null);
+      const res = await axiosClient.get('/stores/me/orders');
+      const data = res?.data || res || [];
+      setOrders(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError('Lỗi kết nối đến máy chủ');
+      setError(err.response?.data?.message || err.message || 'Lỗi khi tải danh sách đơn hàng');
     } finally {
       setLoading(false);
     }
@@ -30,129 +30,189 @@ const StoreOrders = () => {
     fetchOrders();
   }, []);
 
-  // 2. Xử lý khi chủ quán nhập mã vào ô text
   const handleCodeChange = (orderId, value) => {
-    setPickupCodes(prev => ({
+    setPickupCodes((prev) => ({
       ...prev,
-      [orderId]: value
+      [orderId]: value.toUpperCase(),
     }));
   };
 
-  // 3. Xử lý gửi mã xác nhận lên API
+  // 2. Xác nhận nhận hàng qua mã 6 ký tự
   const handleConfirmOrder = async (orderId) => {
-    const code = pickupCodes[orderId];
+    const code = (pickupCodes[orderId] || '').trim().toUpperCase();
     if (!code) {
-      alert('Vui lòng nhập mã xác nhận!');
+      alert('Vui lòng nhập mã nhận hàng 6 ký tự!');
       return;
     }
 
+    setSubmittingId(orderId);
     try {
-      const response = await fetch(`http://localhost:5000/api/orders/${orderId}/confirm`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ pickup_code: code })
-      });
-      
-      const result = await response.json();
-
-      if (result.success) {
-        alert('Xác nhận thành công!');
-        // Xóa ô input đã nhập
-        setPickupCodes(prev => ({ ...prev, [orderId]: '' }));
-        // Tải lại danh sách đơn hàng để cập nhật trạng thái
-        fetchOrders();
-      } else {
-        alert(`Lỗi: ${result.message}`);
-      }
+      await axiosClient.post('/stores/me/orders/confirm', { pickup_code: code });
+      alert('✅ Xác nhận khách nhận hàng thành công!');
+      setPickupCodes((prev) => ({ ...prev, [orderId]: '' }));
+      fetchOrders();
     } catch (err) {
-      alert('Đã xảy ra lỗi khi xác nhận đơn hàng.');
+      alert(`Lỗi: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setSubmittingId(null);
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-gray-600">Đang tải danh sách đơn hàng...</div>;
-  if (error) return <div className="p-8 text-center text-red-500">Lỗi: {error}</div>;
+  // 3. Đánh dấu khách không đến (No-show)
+  const handleMarkNoShow = async (orderId) => {
+    if (!window.confirm('Bạn có chắc muốn đánh dấu khách KHÔNG ĐẾN lấy đơn này?')) return;
+
+    setSubmittingId(orderId);
+    try {
+      await axiosClient.patch(`/stores/me/orders/${orderId}/no-show`);
+      alert('⚠️ Đã đánh dấu khách không đến.');
+      fetchOrders();
+    } catch (err) {
+      alert(`Lỗi: ${err.response?.data?.message || err.message || 'Chưa thể đánh dấu (phải sau khung giờ nhận hàng)'}`);
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  const filteredOrders = orders.filter((o) => {
+    if (activeTab === 'ALL') return true;
+    return o.status === activeTab;
+  });
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'pending':
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200">Chờ nhận hàng</span>;
+      case 'picked_up':
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Đã nhận hàng</span>;
+      case 'no_show':
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-orange-50 text-orange-700 border border-orange-200">Khách không đến</span>;
+      case 'cancelled':
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-red-50 text-red-600 border border-red-200">Đã hủy</span>;
+      default:
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">{status}</span>;
+    }
+  };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white rounded-lg shadow-md mt-10">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Quản lý Đơn hàng (Cửa hàng)</h2>
-      
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-100 text-gray-600 border-b">
-              <th className="p-4">Mã Đơn</th>
-              <th className="p-4">Khách hàng</th>
-              <th className="p-4">Món ăn</th>
-              <th className="p-4">Tổng tiền</th>
-              <th className="p-4">Trạng thái</th>
-              <th className="p-4 text-center">Hành động</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.length === 0 ? (
-              <tr>
-                <td colSpan="6" className="p-4 text-center text-gray-500">Chưa có đơn hàng nào.</td>
-              </tr>
-            ) : (
-              orders.map((order) => (
-                <tr key={order.id} className="border-b hover:bg-gray-50">
-                  <td className="p-4 font-medium">#{order.id}</td>
-                  <td className="p-4">
-                    <p className="font-semibold text-gray-800">{order.customer_name}</p>
-                    <p className="text-sm text-gray-500">{order.customer_phone}</p>
-                  </td>
-                  <td className="p-4">
-                    <p className="text-gray-800">{order.food_name}</p>
-                    <p className="text-sm text-gray-500">SL: {order.quantity}</p>
-                  </td>
-                  <td className="p-4 font-semibold text-red-500">
-                    {order.total_price.toLocaleString()} đ
-                  </td>
-                  <td className="p-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      order.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                      order.status === 'picked_up' ? 'bg-green-100 text-green-700' :
-                      order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      {order.status === 'pending' ? 'Chờ nhận' :
-                        order.status === 'picked_up' ? 'Đã nhận' :
-                        order.status === 'cancelled' ? 'Đã hủy' : 'Không đến'}
-                    </span>
-                  </td>
-                  <td className="p-4 flex justify-center items-center gap-2">
-                    {order.status === 'pending' ? (
-                      <>
-                        <input
-                          type="text"
-                          maxLength="6"
-                          placeholder="Mã 6 ký tự"
-                          value={pickupCodes[order.id] || ''}
-                          onChange={(e) => handleCodeChange(order.id, e.target.value)}
-                          className="w-28 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
-                        />
-                        <button
-                          onClick={() => handleConfirmOrder(order.id)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition"
-                        >
-                          Xác nhận
-                        </button>
-                      </>
-                    ) : (
-                      <span className="text-gray-400 text-sm italic">Không khả dụng</span>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-[#111827]">Quản lý đơn hàng</h1>
+          <p className="text-sm text-[#4B5563] mt-1">Đối soát mã nhận hàng tại quầy và xử lý đơn quá hạn.</p>
+        </div>
+        <button
+          onClick={fetchOrders}
+          className="text-xs font-semibold text-[#2563EB] bg-[#EFF6FF] border border-[#BFDBFE] hover:bg-blue-100 px-3 py-2 rounded-lg transition-colors cursor-pointer self-start sm:self-auto"
+        >
+          🔄 Làm mới danh sách
+        </button>
       </div>
+
+      {/* Tabs lọc trạng thái */}
+      <div className="flex items-center gap-2 border-b border-[#E5E7EB] pb-3 overflow-x-auto">
+        {[
+          { key: 'ALL', label: 'Tất cả' },
+          { key: 'pending', label: 'Chờ lấy món' },
+          { key: 'picked_up', label: 'Đã hoàn tất' },
+          { key: 'no_show', label: 'Không đến' },
+          { key: 'cancelled', label: 'Đã hủy' },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`text-xs sm:text-sm font-medium px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
+              activeTab === tab.key ? 'bg-[#2563EB] text-white font-semibold' : 'text-[#4B5563] hover:bg-gray-100'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="bg-white p-12 text-center rounded-2xl border border-[#E5E7EB] text-sm text-gray-500">Đang tải danh sách đơn hàng...</div>
+      ) : error ? (
+        <div className="bg-white p-8 text-center rounded-2xl border border-red-200 text-red-600 text-sm space-y-3">
+          <p>{error}</p>
+          <button onClick={fetchOrders} className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg">Thử lại</button>
+        </div>
+      ) : filteredOrders.length === 0 ? (
+        <div className="bg-white p-12 text-center rounded-2xl border border-[#E5E7EB] text-sm text-gray-400">Không có đơn hàng nào trong mục này.</div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-[#F9FAFB] text-xs font-semibold text-[#6B7280] uppercase tracking-wider border-b border-[#E5E7EB]">
+                <tr>
+                  <th className="px-6 py-3.5">Mã đơn / Khách</th>
+                  <th className="px-6 py-3.5">Món ăn</th>
+                  <th className="px-6 py-3.5">Số lượng</th>
+                  <th className="px-6 py-3.5">Tổng tiền</th>
+                  <th className="px-6 py-3.5">Trạng thái</th>
+                  <th className="px-6 py-3.5 text-center">Thao tác xử lý</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E5E7EB]">
+                {filteredOrders.map((order) => {
+                  const isPending = order.status === 'pending';
+                  const customer = order.buyer?.name || order.buyer_name || order.customer_name || 'Khách hàng';
+                  const phone = order.buyer?.phone || order.buyer_phone || '';
+                  const title = order.listing?.title || order.listing_title || order.food_name || 'Suất ăn';
+
+                  return (
+                    <tr key={order.id} className="hover:bg-gray-50/70">
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-[#111827]">#{order.id}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{customer} {phone ? `· ${phone}` : ''}</p>
+                      </td>
+                      <td className="px-6 py-4 font-semibold text-[#111827]">{title}</td>
+                      <td className="px-6 py-4 font-medium text-[#374151]">{order.quantity} suất</td>
+                      <td className="px-6 py-4 font-bold text-[#2563EB]">{formatMoney(order.total_price)}</td>
+                      <td className="px-6 py-4">{getStatusBadge(order.status)}</td>
+                      <td className="px-6 py-4 text-center">
+                        {isPending ? (
+                          <div className="inline-flex items-center gap-2">
+                            <input
+                              type="text"
+                              maxLength={6}
+                              placeholder="Mã 6 ký tự"
+                              value={pickupCodes[order.id] || ''}
+                              onChange={(e) => handleCodeChange(order.id, e.target.value)}
+                              className="w-28 px-2 py-1.5 text-xs font-mono font-bold tracking-wider text-center border border-[#D1D5DB] rounded-lg focus:outline-none focus:border-[#2563EB]"
+                            />
+                            <button
+                              disabled={submittingId === order.id}
+                              onClick={() => handleConfirmOrder(order.id)}
+                              className="text-xs font-semibold text-white bg-[#2563EB] hover:bg-blue-700 disabled:opacity-50 px-3 py-1.5 rounded-lg transition"
+                            >
+                              Xác nhận
+                            </button>
+                            <button
+                              disabled={submittingId === order.id}
+                              onClick={() => handleMarkNoShow(order.id)}
+                              title="Chỉ áp dụng khi quá giờ nhận hàng"
+                              className="text-xs font-semibold text-orange-700 bg-orange-100 hover:bg-orange-200 disabled:opacity-50 px-2.5 py-1.5 rounded-lg transition"
+                            >
+                              Không đến
+                            </button>
+                          </div>
+                        ) : order.status === 'picked_up' ? (
+                          <span className="text-xs font-medium text-emerald-600">✓ Đã giao thành công</span>
+                        ) : order.status === 'no_show' ? (
+                          <span className="text-xs font-medium text-orange-600">Khách không đến lấy</span>
+                        ) : (
+                          <span className="text-xs font-medium text-gray-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
-};
-
-// Vị trí đúng của lệnh export là ở dưới cùng file
-export default StoreOrders;
+}

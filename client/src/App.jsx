@@ -6,6 +6,7 @@ import BuyerLayout from './layouts/BuyerLayout';
 import StoreLayout from './layouts/StoreLayout';
 import ProtectedRoute from './routes/ProtectedRoute'; 
 import StoreDashboard from './components/store/StoreDashboard';
+import StoreOrders from './components/store/StoreOrders';
 
 // Phân hệ Xác thực
 import AuthPage from './pages/auth/AuthPage';
@@ -66,6 +67,7 @@ export default function App() {
           <Route element={<ProtectedRoute roles={['store']} />}>
             <Route element={<StoreLayout />}>
               <Route path="/store" element={<StorePage />} />
+              <Route path="/store/orders" element={<StoreOrders />} />
               <Route path="/store/dashboard" element={<StoreDashboard />} />
             </Route>
           </Route>
