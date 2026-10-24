@@ -1,40 +1,32 @@
-// src/components/common/Badge.jsx
 import React from 'react';
 
-export default function Badge({ type = 'status', status, count, text, className = '' }) {
+export default function Badge({ type = 'stock', status, text, className = '' }) {
   if (type === 'stock') {
+    const count = Number(status) || 0;
     return (
-      <span className={`px-2 py-1 text-xs font-bold rounded bg-[#DC2626] text-white shadow-sm whitespace-nowrap shrink-0 ${className}`}>
-        Còn {count} suất
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+        count <= 2 
+          ? 'bg-red-50 text-[#DC2626] border border-red-200' 
+          : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+      } ${className}`}>
+        {count === 0 ? 'Hết suất' : `Còn ${count} suất`}
       </span>
     );
   }
 
-  if (type === 'time') {
-    return (
-      <span className={`px-2.5 py-1 text-xs font-medium rounded-full bg-orange-50 text-[#EA580C] border border-orange-200 whitespace-nowrap shrink-0 ${className}`}>
-        {text}
-      </span>
-    );
-  }
-
-  const statusStyles = {
-    PENDING: 'bg-[#FEF3C7] text-[#B45309] border border-amber-300',     // Đang chờ nhận
-    COMPLETED: 'bg-[#DCFCE7] text-[#15803D] border border-emerald-300', // Đã nhận
-    CANCELLED: 'bg-[#FEE2E2] text-[#DC2626] border border-rose-300',    // Đã huỷ
-    NO_SHOW: 'bg-gray-100 text-[#4B5563] border border-gray-300',        // Không đến
+  // Kiểu hiển thị trạng thái đơn hàng (order)
+  const orderStyles = {
+    PENDING: { label: 'Chờ nhận', style: 'bg-amber-50 text-amber-700 border-amber-200' },
+    COMPLETED: { label: 'Đã nhận', style: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    CANCELLED: { label: 'Đã huỷ', style: 'bg-rose-50 text-rose-600 border-rose-200' },
+    NO_SHOW: { label: 'Không đến', style: 'bg-gray-100 text-gray-600 border-gray-200' }
   };
 
-  const statusLabels = {
-    PENDING: 'Đang chờ nhận',
-    COMPLETED: 'Đã nhận',
-    CANCELLED: 'Đã huỷ',
-    NO_SHOW: 'Không đến',
-  };
+  const current = orderStyles[status] || { label: text || status, style: 'bg-gray-100 text-gray-700 border-gray-200' };
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 ${statusStyles[status] || statusStyles.NO_SHOW} ${className}`}>
-      {text || statusLabels[status] || status}
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${current.style} ${className}`}>
+      {text || current.label}
     </span>
   );
 }
