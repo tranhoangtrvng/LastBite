@@ -16,6 +16,12 @@ import OrderHistoryPage from './pages/buyer/OrderHistoryPage';
 
 // Phân hệ Cửa hàng
 import StorePage from './pages/store/StorePage';
+// Phân hệ Admin
+import AdminLayout from './layouts/AdminLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminStores from './pages/admin/AdminStores';
+import AdminUsers from './pages/admin/AdminUsers';
+import AdminListings from './pages/admin/AdminListings';
 
 // Component giữ chỗ cho Trang Hồ sơ cá nhân (Frame 7)
 const DummyProfile = () => (
@@ -68,8 +74,15 @@ export default function App() {
             </Route>
           </Route>
 
-          {/* 4. Phân hệ Admin: giao diện do VT4 làm, hiện chưa có -> tạm đưa về trang chủ */}
-          <Route path="/admin/*" element={<Navigate to="/foods" replace />} />
+          {/* 4. Phân hệ Admin (chỉ tài khoản role = admin) */}
+          <Route element={<ProtectedRoute roles={['admin']} />}>
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="stores" element={<AdminStores />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="listings" element={<AdminListings />} />
+            </Route>
+          </Route>
 
           {/* 5. Fallback cho các đường dẫn sai */}
           <Route path="*" element={<Navigate to="/foods" replace />} />
@@ -77,4 +90,4 @@ export default function App() {
       </BrowserRouter>
     </AuthProvider>
   );
-}
+}
