@@ -1,7 +1,7 @@
 {
   "name": "lastbite",
   "version": "1.0.0",
-  "type" : "module",
+  "type": "module",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -17,7 +17,8 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-hook-form": "^7.90.0",
-    "react-router-dom": "^7.18.4"
+    "react-router-dom": "^7.18.4",
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.2",
