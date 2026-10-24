@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import BuyerLayout from './layouts/BuyerLayout';
 import StoreLayout from './layouts/StoreLayout';
-import ProtectedRoute from './routes/ProtectedRoute';
+import ProtectedRoute from './routes/ProtectedRoute'; 
 
 // Phân hệ Xác thực
 import AuthPage from './pages/auth/AuthPage';
@@ -77,4 +77,4 @@ export default function App() {
       </BrowserRouter>
     </AuthProvider>
   );
-}
+}
