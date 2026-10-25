@@ -1,20 +1,25 @@
+// client/src/components/store/ListingList.jsx
 import React, { useEffect, useState } from 'react';
 import Button from '../common/Button';
 import { listingApi } from '../../api/listingApi';
 import ListingForm from './ListingForm';
+import { formatMoney, resolveImageUrl, isoTime, shortDate, PLACEHOLDER_IMAGE } from '../../utils/format';
 
-export default function ListingList() {
+export default function ListingList({ store = null }) {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editingListing, setEditingListing] = useState(null); // null = danh sách, có data = mở form sửa, 'NEW' = form tạo mới
+  const [loadError, setLoadError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [editingListing, setEditingListing] = useState(null);
 
   const fetchListings = async () => {
     try {
       setLoading(true);
-      const res = await listingApi.getMyListings();
-      if (res.data) setListings(res.data);
+      setLoadError('');
+      const res = await listingApi.getMyListings({ limit: 50 });
+      setListings(res.data || []);
     } catch (error) {
-      console.error("Lỗi lấy danh sách:", error);
+      setLoadError(error.message);
     } finally {
       setLoading(false);
     }
@@ -24,29 +29,34 @@ export default function ListingList() {
     fetchListings();
   }, []);
 
-  // Hàm cắt giờ phút từ chuỗi ISO của DB
-  const formatTime = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  };
-
   const handleDelete = async (id) => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa tin này?')) return;
+    setActionError('');
     try {
       await listingApi.deleteListing(id);
-      fetchListings(); // Load lại danh sách sau khi xóa
+      fetchListings();
     } catch (error) {
-      alert('Lỗi khi xóa tin');
+      setActionError(error.message);
     }
   };
 
-  // Nếu đang ở trạng thái chỉnh sửa hoặc tạo mới thì render Form
+
+  const handleDuplicate = (item) => {
+    const { id, booked, remaining, ...clonedData } = item;
+    setEditingListing({
+      ...clonedData,
+      id: null,
+      title: item.title, // Giữ nguyên tên món gốc, không thêm (Bản sao)
+      pickup_start: '20:00',
+      pickup_end: '21:30',
+    });
+  };
+
   if (editingListing) {
     return (
       <div className="p-6">
-        <ListingForm 
-          initialData={editingListing === 'NEW' ? null : editingListing} 
+        <ListingForm
+          initialData={editingListing === 'NEW' ? null : editingListing}
           onSuccess={() => {
             setEditingListing(null);
             fetchListings();
@@ -57,24 +67,39 @@ export default function ListingList() {
     );
   }
 
+  const now = new Date();
+
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Quản lý tin đăng</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Quản lý tin đăng</h1>
+          {store && <p className="text-sm text-gray-500 mt-1">{store.name} · {store.address}</p>}
+        </div>
         <Button variant="primary" onClick={() => setEditingListing('NEW')}>
           + Đăng món mới
         </Button>
       </div>
 
+      {actionError && (
+        <div className="mb-4 p-3 text-sm rounded-lg border text-red-600 bg-red-50 border-red-200">{actionError}</div>
+      )}
+
       {loading ? (
         <p className="text-center text-gray-500 py-10">Đang tải dữ liệu...</p>
+      ) : loadError ? (
+        <div className="text-center py-12 bg-white rounded-xl border border-red-200 space-y-3">
+          <p className="font-semibold text-red-600">Không tải được danh sách tin đăng</p>
+          <p className="text-xs text-gray-500">{loadError}</p>
+          <Button variant="outline" onClick={fetchListings}>Thử lại</Button>
+        </div>
       ) : listings.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
           <p className="text-gray-500 mb-4">Cửa hàng chưa có món ăn nào đang thanh lý.</p>
           <Button variant="outline" onClick={() => setEditingListing('NEW')}>Đăng món đầu tiên</Button>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-600">
             <thead className="bg-gray-50 text-gray-700 font-medium border-b border-gray-200">
               <tr>
@@ -87,38 +112,45 @@ export default function ListingList() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {listings.map((item) => {
-                // Lấy chuẩn xác giá trị remaining từ Backend
-                const sl = item.remaining || item.quantity || 0;
+                const remaining = Number(item.remaining ?? 0);
+                const expired = new Date(item.pickup_end) < now;
+                const hidden = item.status === 'hidden';
 
                 return (
                   <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 flex items-center gap-4">
-                      <img 
-                        src={`http://localhost:5000/${(item.image_url || '').replace(/^\//, '')}`} 
-                        alt={item.title} 
-                        className="w-24 h-24 rounded-md object-cover border bg-gray-100 shadow-sm shrink-0"
-                        onError={(e) => { e.target.style.display = 'none'; }}
-                      />
-                      <span className="font-bold text-gray-800 text-base">{item.title}</span>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-4">
+                        <img
+                          src={resolveImageUrl(item.image_url)}
+                          alt={item.title}
+                          className="w-20 h-20 rounded-md object-cover border bg-gray-100 shadow-sm shrink-0"
+                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = PLACEHOLDER_IMAGE; }}
+                        />
+                        <span className="font-bold text-gray-800 text-base">{item.title}</span>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-gray-500">
-                      {formatTime(item.pickup_start)} - {formatTime(item.pickup_end)}
+                      {isoTime(item.pickup_start)} - {isoTime(item.pickup_end)}
+                      <div className="text-xs text-gray-400">ngày {shortDate(item.pickup_start)}</div>
                     </td>
-                    <td className="px-4 py-3 font-semibold text-blue-600">
-                      {Number(item.sale_price).toLocaleString()}đ
-                    </td>
-                    <td className="px-4 py-3">
-                      {sl > 0 ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Còn {sl} suất
-                        </span>
+                    <td className="px-4 py-3 font-semibold text-blue-600">{formatMoney(item.sale_price)}</td>
+                    <td className="px-4 py-3 space-y-1">
+                      {hidden ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">Bị admin ẩn</span>
+                      ) : expired ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Đã hết giờ</span>
+                      ) : remaining > 0 ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Còn {remaining} suất</span>
                       ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          Đã hết
-                        </span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Đã hết</span>
                       )}
+                      <div className="text-xs text-gray-400">Đã đặt {item.booked ?? 0}/{item.quantity}</div>
                     </td>
-                    <td className="px-4 py-3 text-right space-x-2">
+                    <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
+                      {/* Nút nhân bản */}
+                      <Button size="sm" variant="outline" onClick={() => handleDuplicate(item)}>
+                        Nhân bản
+                      </Button>
                       <Button size="sm" variant="secondary" onClick={() => setEditingListing(item)}>
                         Sửa
                       </Button>

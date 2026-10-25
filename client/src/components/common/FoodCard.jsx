@@ -1,62 +1,69 @@
+// src/components/common/FoodCard.jsx
 import React from 'react';
 import Badge from './Badge';
-import Button from './Button';
-import { formatCurrency } from '../../utils/format';
+import { PLACEHOLDER_IMAGE, formatMoney } from '../../utils/format';
 
 export default function FoodCard({ item = {}, onBookNow, onCardClick }) {
-  const fallbackImg = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80';
+  const soldOut = Number(item.quantity) === 0;
 
   return (
-    <div 
+    <div
       onClick={() => onCardClick && onCardClick(item)}
-      className="bg-white rounded-xl border border-[#E5E7EB] overflow-hidden shadow-sm hover:shadow-md transition flex flex-col h-full cursor-pointer group"
+      className="w-full bg-white rounded-xl border border-[#E5E7EB] overflow-hidden shadow-sm hover:shadow-md transition flex flex-col cursor-pointer group"
     >
-      <div className="relative w-full h-44 bg-gray-100 overflow-hidden">
+      {/* Khung ảnh món kèm badge Còn X suất */}
+      <div className="relative w-full h-40 bg-[#F3F4F6] overflow-hidden">
         <img
-          src={item.imageUrl || fallbackImg}
-          alt={item.title || 'Món ăn'}
-          onError={(e) => { e.currentTarget.src = fallbackImg; }}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          src={item.imageUrl}
+          alt={item.title}
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = PLACEHOLDER_IMAGE; }}
+          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
         />
         <div className="absolute top-2.5 left-2.5">
-          <Badge type="stock" status={item.quantity} />
+          <Badge type="stock" count={item.quantity} />
         </div>
       </div>
 
-      <div className="p-4 flex flex-col justify-between flex-1">
+      {/* Thông tin thẻ món */}
+      <div className="p-3.5 flex flex-col gap-2">
         <div>
-          <h3 className="font-bold text-[#111827] text-base line-clamp-1 group-hover:text-[#2563EB] transition-colors">
+          <h3 className="font-bold text-[#111827] text-[15px] leading-tight line-clamp-1 group-hover:text-[#2563EB] transition">
             {item.title}
           </h3>
-          <p className="text-xs text-[#6B7280] mt-1 line-clamp-1">
+          <p className="text-xs text-[#6B7280] line-clamp-1 mt-1">
             {item.storeName} • {item.address}
-          </p>
-          <p className="text-xs text-[#EA580C] font-medium mt-2 flex items-center gap-1">
-            <span>🕒</span> {item.pickupTimeRange}
           </p>
         </div>
 
-        <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-          <div className="flex items-baseline gap-2">
+        <p className="text-xs text-[#EA580C] font-medium flex items-center gap-1">
+          <span>🕒</span>
+          <span>{item.pickupTimeRange}</span>
+        </p>
+
+        {/* Hàng giá & nút Đặt chỗ */}
+        <div className="pt-1 flex items-center justify-between">
+          <div className="flex items-baseline gap-1.5">
             <span className="text-base font-bold text-[#2563EB]">
-              {formatCurrency(item.discountPrice)}
+              {formatMoney(item.discountPrice)}
             </span>
-            {item.originalPrice && (
+            {item.originalPrice ? (
               <span className="text-xs text-[#9CA3AF] line-through">
-                {formatCurrency(item.originalPrice)}
+                {formatMoney(item.originalPrice)}
               </span>
-            )}
+            ) : null}
           </div>
-          <Button 
-            size="sm" 
-            disabled={item.quantity === 0}
+
+          <button
+            type="button"
+            disabled={soldOut}
             onClick={(e) => {
               e.stopPropagation();
               if (onBookNow) onBookNow(item);
             }}
+            className="px-3 py-1.5 bg-[#2563EB] hover:bg-[#1D4ED8] disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-md shadow-sm transition cursor-pointer"
           >
-            {item.quantity === 0 ? 'Hết hàng' : 'Đặt chỗ'}
-          </Button>
+            {soldOut ? 'Hết hàng' : 'Đặt chỗ'}
+          </button>
         </div>
       </div>
     </div>

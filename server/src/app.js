@@ -18,6 +18,14 @@ app.use(morgan('dev'));
 
 // Ảnh người dùng tải lên: http://localhost:5000/uploads/ten-file.jpg
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+// Ảnh của dữ liệu mẫu (database/seed.sql) nằm trong server/seed-images và được đưa lên Git,
+// nên máy nào clone về cũng thấy ảnh. Cùng đường dẫn /uploads/... nên seed.sql không cần sửa.
+app.use('/uploads', express.static(path.join(__dirname, '..', 'seed-images'), {
+  // Express 4 chưa biết đuôi .avif nên tự khai báo loại nội dung cho ảnh pastrami.avif.
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.avif')) res.type('image/avif');
+  },
+}));
 
 app.use('/api', routes);
 

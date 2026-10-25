@@ -2,14 +2,15 @@
 import React, { useState } from 'react';
 import Button from './Button';
 
-export default function FilterSidebar({ onApplyFilter, onResetFilter, className = '' }) {
+// categoryOptions: danh sách loại món lấy từ API GET /categories dạng [{ id, label }]. Không truyền thì dùng danh sách mẫu bên dưới.
+export default function FilterSidebar({ onApplyFilter, onResetFilter, categoryOptions, className = '' }) {
   // Quản lý state các tiêu chí lọc
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedPrice, setSelectedPrice] = useState('all');
   const [selectedTimes, setSelectedTimes] = useState([]);
 
   // Dữ liệu hiển thị chuẩn theo Figma Frame 2
-  const categories = [
+  const categories = categoryOptions && categoryOptions.length > 0 ? categoryOptions : [
     { id: 'com', label: 'Cơm' },
     { id: 'banhmi', label: 'Bánh mì' },
     { id: 'bunpho', label: 'Bún / Phở' },
@@ -137,4 +138,4 @@ export default function FilterSidebar({ onApplyFilter, onResetFilter, className 
       </div>
     </aside>
   );
-}
+}

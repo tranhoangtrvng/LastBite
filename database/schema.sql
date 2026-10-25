@@ -11,7 +11,7 @@
 --
 --  Mức ưu tiên:  P0 = bắt buộc | P1 = nên có | P2 = nếu còn thời gian
 --  Bảng P0: users, stores, categories, listings, orders
---  Bảng P1: favorites      Bảng P2: reviews, notificationslastbit
+--  Bảng P1: favorites      Bảng P2: reviews, notifications
 -- =====================================================================
 
 CREATE DATABASE IF NOT EXISTS lastbite
@@ -19,6 +19,9 @@ CREATE DATABASE IF NOT EXISTS lastbite
   COLLATE utf8mb4_unicode_ci;
 
 USE lastbite;
+
+-- Bắt buộc dùng UTF-8 khi nạp tiếng Việt (tên loại món bên dưới), bất kể máy cài MySQL mặc định gì.
+SET NAMES utf8mb4;
 
 -- ---------------------------------------------------------------------
 -- 1. users : tài khoản của cả 3 vai trò (người mua, cửa hàng, admin)

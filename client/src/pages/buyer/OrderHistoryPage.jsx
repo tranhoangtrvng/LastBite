@@ -1,134 +1,315 @@
-import React, { useState } from 'react';
+
+// client/src/pages/buyer/OrderHistoryPage.jsx
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Badge, Button, Modal } from '../../components/common';
-import { INITIAL_ORDERS } from '../../mocks/mockData';
-import { formatCurrency } from '../../utils/format';
+import { orderApi } from '../../api/orderApi';
+import { toOrderItem } from '../../utils/mappers';
+import { formatMoney, PLACEHOLDER_IMAGE } from '../../utils/format';
+
+// 5 Tab trạng thái theo đúng thiết kế Frame 6 trên Figma
+const TABS = [
+  { id: 'ALL', label: 'Tất cả' },
+  { id: 'PENDING', label: 'Chờ nhận' },
+  { id: 'COMPLETED', label: 'Đã nhận' },
+  { id: 'CANCELLED', label: 'Đã huỷ' },
+  { id: 'NO_SHOW', label: 'Không đến' }
+];
 
 export default function OrderHistoryPage() {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState(INITIAL_ORDERS);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [activeTab, setActiveTab] = useState('ALL');
-  const [cancellingOrderId, setCancellingOrderId] = useState(null);
+  const [orderToCancel, setOrderToCancel] = useState(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelError, setCancelError] = useState('');
 
-  const TABS = [
-    { key: 'ALL', label: 'Tất cả' },
-    { key: 'PENDING', label: 'Chờ nhận' },
-    { key: 'COMPLETED', label: 'Đã nhận' },
-    { key: 'CANCELLED', label: 'Đã huỷ' },
-    { key: 'NO_SHOW', label: 'Không đến' },
-  ];
+  // Tải lịch sử đơn của tôi từ server (GET /orders/my, mới nhất trước)
+  useEffect(() => {
+    let cancelled = false;
+    orderApi
+      .getMyOrders({ limit: 50 })
+      .then((res) => {
+        if (cancelled) return;
+        setOrders(res.data.map(toOrderItem));
+        setLoadError('');
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
-  const filteredOrders = activeTab === 'ALL' 
-    ? orders 
-    : orders.filter((o) => o.status === activeTab);
+  // Đếm số lượng đơn tương ứng cho từng tab
+  const counts = useMemo(() => {
+    return {
+      ALL: orders.length,
+      PENDING: orders.filter((o) => o.status === 'PENDING').length,
+      COMPLETED: orders.filter((o) => o.status === 'COMPLETED').length,
+      CANCELLED: orders.filter((o) => o.status === 'CANCELLED').length,
+      NO_SHOW: orders.filter((o) => o.status === 'NO_SHOW').length
+    };
+  }, [orders]);
 
-  const handleConfirmCancel = () => {
-    setOrders((prev) =>
-      prev.map((ord) => ord.id === cancellingOrderId ? { ...ord, status: 'CANCELLED' } : ord)
-    );
-    setCancellingOrderId(null);
+  // Lọc danh sách theo tab đang chọn
+  const filteredOrders = useMemo(() => {
+    if (activeTab === 'ALL') return orders;
+    return orders.filter((o) => o.status === activeTab);
+  }, [orders, activeTab]);
+
+  // Xử lý xác nhận HỦY ĐƠN: gọi PATCH /orders/:id/cancel (server trả suất lại cho cửa hàng)
+  const handleConfirmCancel = async () => {
+    if (!orderToCancel) return;
+    setCancelBusy(true);
+    setCancelError('');
+    try {
+      await orderApi.cancelOrder(orderToCancel.id);
+      setOrderToCancel(null);
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      setCancelError(err.message); // ví dụ 409 "Đơn không thể huỷ" khi đã quá giờ nhận
+    } finally {
+      setCancelBusy(false);
+    }
+  };
+
+  const closeCancelModal = () => {
+    if (cancelBusy) return;
+    setOrderToCancel(null);
+    setCancelError('');
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-[#111827]">Lịch sử đơn hàng</h1>
+    <div className="max-w-[1200px] mx-auto py-4 px-2 sm:px-0">
+      {/* 1. Tiêu đề trang */}
+      <h1 className="text-2xl font-bold text-[#111827] mb-4">
+        Đơn hàng của tôi
+      </h1>
 
-      {/* Tabs thanh trạng thái */}
-      <div className="flex border-b border-gray-200 gap-2 sm:gap-6 overflow-x-auto pb-px">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`pb-3 px-2 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              activeTab === tab.key
-                ? 'border-[#2563EB] text-[#2563EB] font-bold'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* 2. Thanh Tabs trạng thái */}
+      <div className="flex items-center gap-6 border-b border-transparent mb-6 text-sm overflow-x-auto pb-1">
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.id;
+          const count = counts[tab.id];
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`pb-1 font-medium transition cursor-pointer whitespace-nowrap ${
+                isActive
+                  ? 'text-[#2563EB] border-b-2 border-[#2563EB]'
+                  : 'text-[#6B7280] hover:text-[#111827]'
+              }`}
+            >
+              {tab.label}
+              {count > 0 && ` (${count})`}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Danh sách đơn hàng dạng thẻ lưới */}
-      {filteredOrders.length === 0 ? (
-        <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center text-gray-500">
-          Chưa có đơn hàng nào trong mục này.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredOrders.map((order) => (
-            <div key={order.id} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                  <span className="font-mono font-bold text-base text-[#2563EB]">{order.id}</span>
-                  <Badge type="order" status={order.status} />
-                </div>
+      {/* 3. Lưới hiển thị 2 cột chuẩn Figma */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {loading ? (
+          <div className="col-span-2 text-center py-12 text-sm text-[#6B7280] bg-white rounded-xl border border-[#E5E7EB]">
+            Đang tải đơn hàng...
+          </div>
+        ) : loadError ? (
+          <div className="col-span-2 text-center py-12 text-sm bg-white rounded-xl border border-red-200 space-y-3">
+            <p className="font-semibold text-red-600">Không tải được đơn hàng</p>
+            <p className="text-xs text-gray-500">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => { setLoading(true); setReloadKey((k) => k + 1); }}
+              className="px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-lg cursor-pointer"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : filteredOrders.length === 0 ? (
+          <div className="col-span-2 text-center py-12 text-sm text-[#6B7280] bg-white rounded-xl border border-[#E5E7EB]">
+            Không có đơn hàng nào trong mục này.
+          </div>
+        ) : (
+          filteredOrders.map((order) => {
+            const isPending = order.status === 'PENDING';
+            const isCompleted = order.status === 'COMPLETED';
 
-                <div className="flex gap-4 mt-3">
-                  <img
-                    src={order.imageUrl}
-                    alt={order.title}
-                    className="w-20 h-20 rounded-lg object-cover bg-gray-50 shrink-0 cursor-pointer"
-                    onClick={() => navigate(`/foods/${order.foodId}`)}
-                  />
-                  <div className="space-y-1">
-                    <h3 
+            return (
+              <div
+                key={order.id}
+                className="bg-white rounded-xl border border-[#E5E7EB] p-5 flex flex-col justify-between shadow-sm"
+              >
+                <div>
+                  {/* Header thẻ: Tên quán & Địa chỉ • Badge trạng thái */}
+                  <div className="flex items-center justify-between gap-2 mb-4">
+                    <span className="text-sm text-[#111827] truncate">
+                      <strong className="font-bold">{order.storeName}</strong>
+                      <span className="text-[#6B7280] font-normal">
+                        {' '}• {order.address}
+                      </span>
+                    </span>
+
+                    {/* Badge trạng thái */}
+                    {isPending && (
+                      <span className="bg-[#FEF08A] text-[#854D0E] text-[11px] font-semibold px-2.5 py-0.5 rounded-full shrink-0">
+                        Đang chờ nhận
+                      </span>
+                    )}
+                    {isCompleted && (
+                      <span className="bg-[#22C55E] text-white text-[11px] font-semibold px-2.5 py-0.5 rounded-full shrink-0">
+                        Đã nhận
+                      </span>
+                    )}
+                    {order.status === 'CANCELLED' && (
+                      <span className="bg-[#FEE2E2] text-[#DC2626] text-[11px] font-semibold px-2.5 py-0.5 rounded-full shrink-0">
+                        Đã huỷ
+                      </span>
+                    )}
+                    {order.status === 'NO_SHOW' && (
+                      <span className="bg-gray-100 text-[#4B5563] text-[11px] font-semibold px-2.5 py-0.5 rounded-full shrink-0">
+                        Không đến
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Body thẻ: Ảnh thật sắc nét + Thông tin đơn hàng */}
+                  <div className="flex gap-4 items-start mb-6">
+                    <img
+                      src={order.imageUrl}
+                      alt={order.title}
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = PLACEHOLDER_IMAGE; }}
                       onClick={() => navigate(`/foods/${order.foodId}`)}
-                      className="font-bold text-[#111827] text-sm hover:text-[#2563EB] cursor-pointer line-clamp-1"
-                    >
-                      {order.title}
-                    </h3>
-                    <p className="text-xs text-gray-500">{order.storeName}</p>
-                    <p className="text-xs text-[#EA580C] font-medium">🕒 {order.pickupTimeRange}</p>
-                    <p className="text-xs text-gray-600">Số lượng: <strong>{order.quantity} suất</strong></p>
+                      className="w-[72px] h-[72px] rounded-lg object-cover shrink-0 cursor-pointer hover:opacity-85 transition border border-[#E5E7EB] bg-gray-100"
+                      title="Xem chi tiết món"
+                    />
+
+                    <div className="text-xs text-[#4B5563] space-y-1">
+                      <p
+                        onClick={() => navigate(`/foods/${order.foodId}`)}
+                        className="text-sm font-bold text-[#111827] cursor-pointer hover:text-[#2563EB] transition"
+                      >
+                        {order.title} × {order.quantity}
+                      </p>
+
+                      {isPending && (
+                        <>
+                          <p className="text-[#4B5563]">
+                            Nhận trước: {order.pickupTime}
+                          </p>
+                          <p className="text-[#4B5563]">
+                            Mã: <strong className="font-bold text-[#111827]">{order.code}</strong>
+                          </p>
+                        </>
+                      )}
+
+                      {isCompleted && (
+                        <p className="text-[#4B5563]">
+                          Đã nhận lúc: {order.completedTime}
+                        </p>
+                      )}
+
+                      <p className="text-[#4B5563]">
+                        Tổng tiền:{' '}
+                        <strong className="text-sm font-bold text-[#2563EB]">
+                          {formatMoney(order.totalPrice)}
+                        </strong>
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+                {/* Nút hành động Full-width chân thẻ */}
                 <div>
-                  <span className="text-xs text-gray-400 block">Thanh toán tại quầy</span>
-                  <span className="text-base font-bold text-[#111827]">{formatCurrency(order.totalPrice)}</span>
-                </div>
-
-                <div className="flex gap-2">
-                  {order.status === 'PENDING' ? (
-                    <Button variant="danger" size="sm" onClick={() => setCancellingOrderId(order.id)}>
-                      Hủy đơn
-                    </Button>
+                  {isPending ? (
+                    <button
+                      type="button"
+                      onClick={() => setOrderToCancel(order)}
+                      className="w-full py-2.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold rounded-lg transition tracking-wide cursor-pointer uppercase"
+                    >
+                      HỦY ĐƠN
+                    </button>
                   ) : (
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/foods/${order.foodId}`)}>
-                      Đặt lại
-                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/foods/${order.foodId}`)}
+                      className="w-full py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-lg transition tracking-wide cursor-pointer uppercase"
+                    >
+                      ĐẶT LẠI
+                    </button>
                   )}
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            );
+          })
+        )}
+      </div>
 
-      {/* Modal dùng chung cho Xác nhận hủy đơn */}
-      <Modal
-        isOpen={Boolean(cancellingOrderId)}
-        onClose={() => setCancellingOrderId(null)}
-        title="Xác nhận hủy đặt chỗ"
-      >
-        <div className="space-y-4 text-center">
-          <p className="text-sm text-gray-600">
-            Bạn có chắc chắn muốn hủy đơn hàng <strong>{cancellingOrderId}</strong>? Suất ăn này sẽ được nhường lại cho người khác.
-          </p>
-          <div className="flex justify-center gap-3 pt-2">
-            <Button variant="outline" size="md" onClick={() => setCancellingOrderId(null)}>
-              Giữ lại đơn
-            </Button>
-            <Button variant="danger" size="md" onClick={handleConfirmCancel}>
-              Xác nhận hủy
-            </Button>
+      {/* Modal xác nhận HỦY ĐƠN (Icon Vector SVG chuẩn nét) */}
+      {orderToCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-xl border border-gray-100">
+            {/* SVG Warning Icon */}
+            <div className="w-12 h-12 rounded-full bg-red-50 text-[#DC2626] flex items-center justify-center mx-auto border border-red-100">
+              <svg 
+                className="w-6 h-6" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                strokeWidth="2" 
+                stroke="currentColor"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" 
+                />
+              </svg>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-[#111827]">
+                Xác nhận hủy đơn?
+              </h3>
+              <p className="text-xs text-[#4B5563] leading-relaxed">
+                Suất ăn <strong className="text-[#111827]">"{orderToCancel.title}"</strong> sẽ được mở lại cho người khác và mã <strong>{orderToCancel.code}</strong> sẽ bị vô hiệu hóa.
+              </p>
+            </div>
+
+            {cancelError && (
+              <div className="p-2.5 bg-red-50 border border-red-200 text-red-600 rounded-lg text-xs font-medium">
+                ⚠️ {cancelError}
+              </div>
+            )}
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={closeCancelModal}
+                disabled={cancelBusy}
+                className="flex-1 py-2.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition cursor-pointer disabled:opacity-50"
+              >
+                Giữ lại
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCancel}
+                disabled={cancelBusy}
+                className="flex-1 py-2.5 text-xs font-bold text-white bg-[#DC2626] hover:bg-[#B91C1C] rounded-xl transition cursor-pointer shadow-sm disabled:opacity-60"
+              >
+                {cancelBusy ? 'Đang huỷ...' : 'Xác nhận hủy'}
+              </button>
+            </div>
           </div>
         </div>
-      </Modal>
+      )}
     </div>
   );
 }
+

@@ -6,25 +6,28 @@ import { useAuth } from '../context/AuthContext';
 export default function BuyerLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
 
   const handleLogout = () => {
     logout();
     navigate('/auth');
   };
 
+  // Khách chưa đăng nhập và người mua thấy menu người mua; cửa hàng có thêm lối về khu quản lý của mình
+  // (giao diện admin do VT4 làm, có thì thêm lại link /admin ở đây).
   const navLinks = [
     { name: 'Trang chủ', path: '/foods' },
-    { name: 'Đơn hàng của tôi', path: '/orders' },
+    ...(!user || user.role === 'buyer' ? [{ name: 'Đơn hàng của tôi', path: '/orders' }] : []),
+    ...(user?.role === 'store' ? [{ name: 'Quản lý cửa hàng', path: '/store' }] : []),
   ];
 
-  const displayName = user?.name || user?.emailOrPhone || 'Hải Anh';
+  const displayName = user?.name || user?.email || '';
   const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F9FAFB] text-[#111827]">
       {/* HEADER: Chiều cao 80px cố định, menu giữa căn tuyệt đối ở tâm */}
-      <header className="sticky top-0 z-40 bg-white border-b border-[#E5E7EB] h-20 shadow-2xs">
+      <header className="sticky top-0 z-40 bg-white border-b border-[#E5E7EB] h-20 shadow-sm">
         <div className="max-w-[1200px] mx-auto h-full px-4 sm:px-6 flex items-center justify-between relative">
           
           {/* Logo */}
@@ -50,23 +53,34 @@ export default function BuyerLayout() {
             })}
           </nav>
 
-          {/* Cụm User & Đăng xuất */}
+          {/* Cụm User & Đăng xuất (khách chưa đăng nhập thì hiện nút Đăng nhập) */}
           <div className="flex items-center gap-3 shrink-0 z-10">
-            <Link to="/profile" className="flex items-center gap-2 group">
-              <div className="w-8 h-8 rounded-full bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center font-bold text-xs border border-[#BFDBFE]">
-                {initial}
-              </div>
-              <span className="hidden sm:inline text-sm font-medium text-[#374151] group-hover:text-[#2563EB]">
-                {displayName}
-              </span>
-            </Link>
-            
-            <button
-              onClick={handleLogout}
-              className="text-xs font-semibold text-[#DC2626] bg-[#FEE2E2] hover:bg-[#FCA5A5] px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-            >
-              Đăng xuất
-            </button>
+            {isAuthenticated ? (
+              <>
+                <Link to="/profile" className="flex items-center gap-2 group">
+                  <div className="w-8 h-8 rounded-full bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center font-bold text-xs border border-[#BFDBFE]">
+                    {initial}
+                  </div>
+                  <span className="hidden sm:inline text-sm font-medium text-[#374151] group-hover:text-[#2563EB]">
+                    {displayName}
+                  </span>
+                </Link>
+
+                <button
+                  onClick={handleLogout}
+                  className="text-xs font-semibold text-[#DC2626] bg-[#FEE2E2] hover:bg-[#FCA5A5] px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                >
+                  Đăng xuất
+                </button>
+              </>
+            ) : (
+              <Link
+                to="/auth"
+                className="text-xs font-semibold text-white bg-[#2563EB] hover:bg-[#1D4ED8] px-4 py-2 rounded-lg transition-colors"
+              >
+                Đăng nhập
+              </Link>
+            )}
           </div>
         </div>
       </header>
@@ -83,4 +97,4 @@ export default function BuyerLayout() {
       </footer>
     </div>
   );
-}
+}
