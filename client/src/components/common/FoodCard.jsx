@@ -1,11 +1,13 @@
 // src/components/common/FoodCard.jsx
 import React from 'react';
 import Badge from './Badge';
-import { PLACEHOLDER_IMAGE } from '../../utils/format';
+import { PLACEHOLDER_IMAGE, formatMoney } from '../../utils/format';
 
-export default function FoodCard({ item, onBookNow, onCardClick }) {
+export default function FoodCard({ item = {}, onBookNow, onCardClick }) {
+  const soldOut = Number(item.quantity) === 0;
+
   return (
-    <div 
+    <div
       onClick={() => onCardClick && onCardClick(item)}
       className="w-full bg-white rounded-xl border border-[#E5E7EB] overflow-hidden shadow-sm hover:shadow-md transition flex flex-col cursor-pointer group"
     >
@@ -22,7 +24,7 @@ export default function FoodCard({ item, onBookNow, onCardClick }) {
         </div>
       </div>
 
-      {/* Thông tin thẻ món: padding 14px, các dòng ôm khít không đường kẻ thừa[cite: 10] */}
+      {/* Thông tin thẻ món */}
       <div className="p-3.5 flex flex-col gap-2">
         <div>
           <h3 className="font-bold text-[#111827] text-[15px] leading-tight line-clamp-1 group-hover:text-[#2563EB] transition">
@@ -38,29 +40,32 @@ export default function FoodCard({ item, onBookNow, onCardClick }) {
           <span>{item.pickupTimeRange}</span>
         </p>
 
-        {/* Hàng giá & nút Đặt chỗ[cite: 10] */}
+        {/* Hàng giá & nút Đặt chỗ */}
         <div className="pt-1 flex items-center justify-between">
           <div className="flex items-baseline gap-1.5">
             <span className="text-base font-bold text-[#2563EB]">
-              {item.discountPrice.toLocaleString('vi-VN')}đ
+              {formatMoney(item.discountPrice)}
             </span>
-            <span className="text-xs text-[#9CA3AF] line-through">
-              {item.originalPrice.toLocaleString('vi-VN')}đ
-            </span>
+            {item.originalPrice ? (
+              <span className="text-xs text-[#9CA3AF] line-through">
+                {formatMoney(item.originalPrice)}
+              </span>
+            ) : null}
           </div>
 
           <button
             type="button"
+            disabled={soldOut}
             onClick={(e) => {
               e.stopPropagation();
               if (onBookNow) onBookNow(item);
             }}
-            className="px-3 py-1.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-md shadow-sm transition cursor-pointer"
+            className="px-3 py-1.5 bg-[#2563EB] hover:bg-[#1D4ED8] disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-md shadow-sm transition cursor-pointer"
           >
-            Đặt chỗ
+            {soldOut ? 'Hết hàng' : 'Đặt chỗ'}
           </button>
         </div>
       </div>
     </div>
   );
-}
+}
