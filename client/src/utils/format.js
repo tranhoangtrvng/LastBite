@@ -26,6 +26,9 @@ export function formatMoney(value) {
   return `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 }
 
+// Tên cũ do nhánh buyer-profile dùng, giữ lại để code cũ không bị lỗi. Cùng kết quả với formatMoney.
+export const formatCurrency = formatMoney;
+
 // Ngày hôm nay theo máy người dùng, dạng "YYYY-MM-DD" (dùng để so với phần ngày của chuỗi ISO).
 export function todayString() {
   const now = new Date();
@@ -47,6 +50,13 @@ export function shortDate(iso) {
 export function formatPickupRange(startIso, endIso) {
   return `${isoTime(startIso)} - ${isoTime(endIso)}`;
 }
+
+// Định dạng khoảng giờ từ hai chuỗi giờ đã có sẵn, ví dụ "19:30" và "20:30" -> "19:30 - 20:30".
+// Giữ lại từ nhánh buyer-profile; thiếu dữ liệu thì trả "Trong ngày".
+export const formatTimeRange = (startTime, endTime) => {
+  if (!startTime || !endTime) return 'Trong ngày';
+  return `${startTime} - ${endTime}`;
+};
 
 // "HH:mm - dd/MM/yyyy" (hiển thị giờ nhận hàng của đơn đã hoàn tất)
 export function formatDateTime(iso) {

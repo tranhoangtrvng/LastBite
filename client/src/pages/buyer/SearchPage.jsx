@@ -51,6 +51,7 @@ export default function SearchPage() {
   const [reloadKey, setReloadKey] = useState(0); // tăng lên để tải lại danh sách (sau khi đặt chỗ)
   const [categoryOptions, setCategoryOptions] = useState([]);
 
+  // State quản lý luồng Modal đặt chỗ & Modal mã đối soát 6 ký tự
   const [selectedItem, setSelectedItem] = useState(null);
   const [pickupCodeData, setPickupCodeData] = useState(null);
   const [bookingBusy, setBookingBusy] = useState(false);
@@ -96,7 +97,7 @@ export default function SearchPage() {
     setPage(1);
   }, [keyword, filters, sortBy]);
 
-  // Logic lọc và sắp xếp
+  // ==================== LOGIC XỬ LÝ DỮ LIỆU (SEARCH / FILTER / SORT) ====================
   const processedFoods = useMemo(() => {
     let result = [...foods];
 
@@ -120,7 +121,7 @@ export default function SearchPage() {
       result.sort((a, b) => a.discountPrice - b.discountPrice);
     } else if (sortBy === 'price_desc') {
       result.sort((a, b) => b.discountPrice - a.discountPrice);
-    } else if (sortBy === 'discount_desc') {
+    } else if (sortBy === 'discount_desc' || sortBy === 'discount') {
       result.sort((a, b) => (b.originalPrice - b.discountPrice) - (a.originalPrice - a.discountPrice));
     } else {
       // newest: tin đăng mới nhất lên đầu
@@ -163,7 +164,7 @@ export default function SearchPage() {
 
   return (
     <div className="flex flex-col lg:flex-row gap-8 items-start">
-      {/* CỘT TRÁI: SIDEBAR BỘ LỌC */}
+      {/* CỘT TRÁI: BỘ LỌC TÌM KIẾM (SIDEBAR CỐ ĐỊNH KHI CUỘN) */}
       <aside className="w-full lg:w-[280px] shrink-0 sticky top-28">
         <FilterSidebar
           categoryOptions={categoryOptions}
@@ -172,9 +173,10 @@ export default function SearchPage() {
         />
       </aside>
 
-      {/* CỘT PHẢI: KẾT QUẢ TÌM KIẾM */}
+      {/* CỘT PHẢI: KẾT QUẢ TÌM KIẾM & LƯỚI MÓN ĂN */}
       <section className="flex-1 w-full space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-[#E5E7EB]">
+        {/* Toolbar: Thanh tìm kiếm & Dropdown sắp xếp */}
+        <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-[#E5E7EB] shadow-xs">
           <SearchBar
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
@@ -207,7 +209,7 @@ export default function SearchPage() {
         ) : processedFoods.length === 0 ? (
           <div className="bg-white p-12 text-center rounded-xl border border-[#E5E7EB] space-y-2">
             <p className="text-base font-semibold text-gray-700">Không tìm thấy suất ăn nào phù hợp</p>
-            <p className="text-xs text-gray-400">Hãy thử bỏ bớt tiêu chí lọc hoặc đổi từ khóa tìm kiếm.</p>
+            <p className="text-xs text-gray-400">Hãy thử xóa từ khóa hoặc nới lỏng các tiêu chí bộ lọc.</p>
           </div>
         ) : (
           <>
@@ -240,7 +242,7 @@ export default function SearchPage() {
         />
       )}
 
-      {/* Frame 5: Modal Mã nhận hàng 6 ký tự (Đã đồng bộ đầy đủ bookingData và onGoHome) */}
+      {/* Frame 5: Modal Mã nhận hàng 6 ký tự */}
       {pickupCodeData && (
         <PickupSuccessModal
           isOpen={Boolean(pickupCodeData)}
