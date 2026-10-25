@@ -1,3 +1,4 @@
+// client/src/components/store/ListingList.jsx
 import React, { useEffect, useState } from 'react';
 import Button from '../common/Button';
 import { listingApi } from '../../api/listingApi';
@@ -9,7 +10,7 @@ export default function ListingList({ store = null }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
-  const [editingListing, setEditingListing] = useState(null); // null = danh sách, có data = mở form sửa, 'NEW' = form tạo mới
+  const [editingListing, setEditingListing] = useState(null);
 
   const fetchListings = async () => {
     try {
@@ -33,14 +34,24 @@ export default function ListingList({ store = null }) {
     setActionError('');
     try {
       await listingApi.deleteListing(id);
-      fetchListings(); // Load lại danh sách sau khi xóa
+      fetchListings();
     } catch (error) {
-      // ví dụ 409 "Còn 2 đơn đang chờ nhận, hãy xử lý trước khi xoá"
       setActionError(error.message);
     }
   };
 
-  // Nếu đang ở trạng thái chỉnh sửa hoặc tạo mới thì render Form
+
+  const handleDuplicate = (item) => {
+    const { id, booked, remaining, ...clonedData } = item;
+    setEditingListing({
+      ...clonedData,
+      id: null,
+      title: item.title, // Giữ nguyên tên món gốc, không thêm (Bản sao)
+      pickup_start: '20:00',
+      pickup_end: '21:30',
+    });
+  };
+
   if (editingListing) {
     return (
       <div className="p-6">
@@ -112,7 +123,7 @@ export default function ListingList({ store = null }) {
                         <img
                           src={resolveImageUrl(item.image_url)}
                           alt={item.title}
-                          className="w-24 h-24 rounded-md object-cover border bg-gray-100 shadow-sm shrink-0"
+                          className="w-20 h-20 rounded-md object-cover border bg-gray-100 shadow-sm shrink-0"
                           onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = PLACEHOLDER_IMAGE; }}
                         />
                         <span className="font-bold text-gray-800 text-base">{item.title}</span>
@@ -122,30 +133,24 @@ export default function ListingList({ store = null }) {
                       {isoTime(item.pickup_start)} - {isoTime(item.pickup_end)}
                       <div className="text-xs text-gray-400">ngày {shortDate(item.pickup_start)}</div>
                     </td>
-                    <td className="px-4 py-3 font-semibold text-blue-600">
-                      {formatMoney(item.sale_price)}
-                    </td>
+                    <td className="px-4 py-3 font-semibold text-blue-600">{formatMoney(item.sale_price)}</td>
                     <td className="px-4 py-3 space-y-1">
                       {hidden ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">
-                          Bị admin ẩn
-                        </span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">Bị admin ẩn</span>
                       ) : expired ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                          Đã hết giờ nhận
-                        </span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Đã hết giờ</span>
                       ) : remaining > 0 ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Còn {remaining} suất
-                        </span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Còn {remaining} suất</span>
                       ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          Đã hết
-                        </span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Đã hết</span>
                       )}
                       <div className="text-xs text-gray-400">Đã đặt {item.booked ?? 0}/{item.quantity}</div>
                     </td>
-                    <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                    <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
+                      {/* Nút nhân bản */}
+                      <Button size="sm" variant="outline" onClick={() => handleDuplicate(item)}>
+                        Nhân bản
+                      </Button>
                       <Button size="sm" variant="secondary" onClick={() => setEditingListing(item)}>
                         Sửa
                       </Button>
