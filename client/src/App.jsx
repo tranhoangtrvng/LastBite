@@ -9,13 +9,6 @@ import ProtectedRoute from './routes/ProtectedRoute';
 // Phân hệ Xác thực
 import AuthPage from './pages/auth/AuthPage';
 
-// Phân hệ Người mua
-import SearchPage from './pages/buyer/SearchPage';
-import FoodDetailPage from './pages/buyer/FoodDetailPage';
-import OrderHistoryPage from './pages/buyer/OrderHistoryPage';
-
-// Phân hệ Cửa hàng
-import StorePage from './pages/store/StorePage';
 // Phân hệ Người mua (Tất cả các trang chính thức)
 import SearchPage from './pages/buyer/SearchPage';
 import FoodDetailPage from './pages/buyer/FoodDetailPage';
@@ -34,23 +27,11 @@ import AdminStores from './pages/admin/AdminStores';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminListings from './pages/admin/AdminListings';
 
-// Component giữ chỗ cho Trang Hồ sơ cá nhân (Frame 7)
-const DummyProfile = () => (
-  <div className="bg-white p-8 rounded-2xl border border-[#E5E7EB] text-center max-w-2xl mx-auto space-y-3 shadow-sm">
-    <span className="inline-block p-3 bg-emerald-50 text-emerald-600 rounded-full text-xl font-bold">👤</span>
-    <h1 className="text-xl font-bold text-[#111827]">Hồ sơ cá nhân (Frame 7)</h1>
-    <p className="text-sm text-[#4B5563]">
-      Khu vực quản lý thông tin tài khoản cá nhân, cài đặt bảo mật và thống kê số suất ăn đã giải cứu.
-    </p>
-  </div>
-);
-
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* 1. Phân hệ Xác thực */}
           {/* 1. Phân hệ Xác thực (Auth) */}
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/login" element={<Navigate to="/auth" replace />} />
@@ -58,10 +39,6 @@ export default function App() {
 
           {/* 2. Phân hệ Người mua (Dùng chung BuyerLayout có Header 80px & Footer) */}
           <Route element={<BuyerLayout />}>
-            {/* Mặc định chuyển hướng sang danh sách món */}
-            <Route path="/" element={<Navigate to="/foods" replace />} />
-
-            {/* Trang Tìm kiếm món ăn (Frame 2) */}
             {/* Chuyển hướng mặc định về danh sách món ăn */}
             <Route path="/" element={<Navigate to="/foods" replace />} />
 
@@ -73,14 +50,11 @@ export default function App() {
 
             {/* Các trang cần đăng nhập (chưa đăng nhập -> chuyển về /auth) */}
             <Route element={<ProtectedRoute />}>
-              {/* Trang Lịch sử đơn hàng (Frame 6): chỉ người mua */}
               {/* Trang Lịch sử đơn hàng 4 tab & Hủy đơn (Frame 6): chỉ người mua */}
               <Route element={<ProtectedRoute roles={['buyer']} />}>
                 <Route path="/orders" element={<OrderHistoryPage />} />
               </Route>
 
-              {/* Trang Hồ sơ cá nhân (Frame 7) */}
-              <Route path="/profile" element={<DummyProfile />} />
               {/* Trang Quản lý hồ sơ cá nhân (Frame 7) */}
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
@@ -105,7 +79,6 @@ export default function App() {
             </Route>
           </Route>
 
-          {/* 5. Fallback cho các đường dẫn sai */}
           {/* 5. Fallback cho các đường dẫn không tồn tại */}
           <Route path="*" element={<Navigate to="/foods" replace />} />
         </Routes>
