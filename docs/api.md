@@ -425,9 +425,12 @@ Lỗi `400`: không có file, sai định dạng ("Chỉ chấp nhận ảnh JPG
 ```sql
 l.status = 'active' AND s.status = 'approved'
 AND l.pickup_end > NOW() AND l.remaining > 0
+AND l.pickup_start - INTERVAL <BOOKING_LEAD_MINUTES> MINUTE <= NOW()
 ```
 
-Nghĩa là tin còn hiệu lực, cửa hàng đã duyệt, chưa hết giờ nhận, còn suất. Tin hết hạn hoặc hết suất **không** xuất hiện ở đây.
+Nghĩa là tin còn hiệu lực, cửa hàng đã duyệt, chưa hết giờ nhận, còn suất, và **đã mở đặt chỗ**. Tin hết hạn, hết suất hoặc chưa tới giờ mở đặt **không** xuất hiện ở đây.
+
+**Giờ mở đặt chỗ:** người mua chỉ đặt được trong khoảng `BOOKING_LEAD_MINUTES` phút trước `pickup_start` (mặc định 120 phút = 2 tiếng, chỉnh trong `server/.env`). Nhờ vậy số suất hiển thị là số suất dư thật của cuối ngày, không phải số đăng từ sáng. Khi demo ban ngày, đặt `BOOKING_LEAD_MINUTES=1440` để món hiện ra suốt cả ngày.
 
 | Tham số | Kiểu | Ý nghĩa |
 |---|---|---|
@@ -486,6 +489,8 @@ Phản hồi **200**:
 
 Khác với danh sách, trang chi tiết **vẫn trả về** tin đã hết hạn hoặc hết suất, kèm `"is_available": false` để frontend hiển thị "Đã hết suất" hoặc "Đã hết giờ nhận" và khoá nút đặt. `is_available = remaining > 0 && pickup_end > bây giờ`.
 
+Mọi đối tượng Listing trả về còn có `booking_opens_at` (ISO 8601: `pickup_start` trừ `BOOKING_LEAD_MINUTES` phút) và `is_booking_open` (`true` khi đã tới mốc đó). Chi tiết của tin **chưa mở đặt** vẫn xem được, nhưng frontend khoá nút đặt và ghi "Mở đặt chỗ lúc ...".
+
 Lỗi `404` khi tin không tồn tại, có `status` là `hidden` hoặc `deleted`, hoặc cửa hàng chưa được duyệt.
 
 ---
@@ -507,8 +512,10 @@ Tạo tin mới.
 | `original_price` | int | Có | Từ 1.000 đồng |
 | `sale_price` | int | Có | Từ 1.000 đồng và **nhỏ hơn hoặc bằng** `original_price` |
 | `quantity` | int | Có | 1 đến 999 |
-| `pickup_start` | ISO 8601 | Có | Giờ bắt đầu nhận |
-| `pickup_end` | ISO 8601 | Có | **Sau** `pickup_start` và **sau thời điểm hiện tại** |
+| `pickup_start` | ISO 8601 | Có | Giờ bắt đầu nhận, phải nằm trong **ngày hôm nay** (giờ Việt Nam) |
+| `pickup_end` | ISO 8601 | Có | **Sau** `pickup_start`, **sau thời điểm hiện tại** và nằm trong **ngày hôm nay** (không qua 24:00) |
+
+Quy tắc "chỉ đăng suất dư cuối ngày" cũng áp dụng khi `PUT /listings/:id` có gửi `pickup_start` hoặc `pickup_end`. Sửa giá, số suất... mà không đụng tới giờ nhận thì không bị kiểm tra ngày.
 
 ```json
 {
@@ -702,13 +709,13 @@ Lỗi: `400`, `409` "Bạn đã đăng ký cửa hàng".
 { "listing_id": 15, "quantity": 2 }
 ```
 
-**Điều kiện đặt được:** tin `active`, cửa hàng `approved`, `pickup_end` chưa qua, `remaining >= quantity`.
+**Điều kiện đặt được:** tin `active`, cửa hàng `approved`, `pickup_end` chưa qua, **đã tới giờ mở đặt chỗ** (`pickup_start` trừ `BOOKING_LEAD_MINUTES` phút), `remaining >= quantity`.
 
 **Xử lý trong một transaction** (chống bán lố, xem mục 5.2):
 
 1. `START TRANSACTION`.
 2. Đọc `sale_price` của tin (`SELECT ... FOR UPDATE`).
-3. `UPDATE listings SET remaining = remaining - ? WHERE id = ? AND status = 'active' AND pickup_end > NOW() AND remaining >= ?`. Nếu số dòng bị ảnh hưởng bằng 0 thì `ROLLBACK` và trả 409.
+3. `UPDATE listings SET remaining = remaining - ? WHERE id = ? AND status = 'active' AND pickup_end > NOW() AND pickup_start - INTERVAL <BOOKING_LEAD_MINUTES> MINUTE <= NOW() AND remaining >= ?`. Nếu số dòng bị ảnh hưởng bằng 0 thì `ROLLBACK` và trả 409.
 4. Sinh `pickup_code`, `INSERT` vào `orders` với `unit_price` và `total_price`. Nếu trùng mã (`ER_DUP_ENTRY`) thì sinh mã khác và thử lại.
 5. `COMMIT`.
 
@@ -753,6 +760,7 @@ Lỗi:
 | 403 | Không phải buyer | "Chỉ người mua mới đặt chỗ được" |
 | 404 | Tin không tồn tại hoặc không hiển thị | "Không tìm thấy suất ăn" |
 | 409 | Hết giờ nhận | "Suất này đã hết giờ nhận" |
+| 409 | Chưa tới giờ mở đặt | "Suất này chưa mở đặt chỗ, bạn đặt được từ 18:00" |
 | 409 | Không đủ suất | "Không đủ suất, chỉ còn 1 suất" |
 
 #### GET /orders/my
@@ -828,6 +836,7 @@ Lỗi:
 | 404 | Mã không có hoặc thuộc cửa hàng khác | "Mã nhận hàng không đúng hoặc không thuộc cửa hàng của bạn" |
 | 409 | Đơn đã nhận | "Đơn này đã được nhận trước đó" |
 | 409 | Đơn đã huỷ hoặc đã đánh dấu không đến | "Đơn này đã bị huỷ" hoặc "Đơn này đã được đánh dấu không đến" |
+| 409 | Đã quá giờ nhận (`pickup_end`) | "Đã quá giờ nhận hàng, không thể xác nhận đơn này" |
 
 #### PATCH /stores/me/orders/:id/no-show
 
@@ -1037,6 +1046,8 @@ Thống kê tổng quan, gồm **số suất đã cứu**.
 | `pickup_start`, `pickup_end` | ISO 8601 | |
 | `status` | string | `active`, `hidden`, `deleted` |
 | `is_available` | boolean | `remaining > 0` và chưa quá `pickup_end` |
+| `booking_opens_at` | ISO 8601 | Giờ bắt đầu cho phép đặt chỗ: `pickup_start` trừ `BOOKING_LEAD_MINUTES` phút |
+| `is_booking_open` | boolean | `true` khi bây giờ đã tới `booking_opens_at` |
 | `created_at` | ISO 8601 | |
 
 ### Order
@@ -1065,7 +1076,7 @@ Thống kê tổng quan, gồm **số suất đã cứu**.
 
 | Nơi hiển thị | Điều kiện |
 |---|---|
-| Danh sách công khai `GET /listings` | `l.status = 'active'` và `s.status = 'approved'` và `pickup_end > NOW()` và `remaining > 0` |
+| Danh sách công khai `GET /listings` | `l.status = 'active'` và `s.status = 'approved'` và `pickup_end > NOW()` và `remaining > 0` và đã tới giờ mở đặt (`pickup_start` trừ `BOOKING_LEAD_MINUTES` phút <= `NOW()`) |
 | Chi tiết công khai `GET /listings/:id` | `l.status = 'active'` và `s.status = 'approved'` (không lọc hết hạn, hết suất) |
 | Cửa hàng xem tin của mình | Mọi tin không `deleted` |
 | Admin | Mọi tin, kể cả `deleted` |
@@ -1088,8 +1099,9 @@ pending ─────────┼── store nhập mã ──────
 |---|---|---|---|
 | `pending` | `picked_up` | store, qua `confirm` | Giữ nguyên (đã bán) |
 | `pending` | `cancelled` | buyer | **Cộng lại** `quantity` vào `remaining` |
-| `pending` | `no_show` | store, sau `pickup_end` | Giữ nguyên (đồ ăn đã để dành cho khách) |
+| `pending` | `no_show` | **server tự động** (tác vụ chạy mỗi phút, đơn quá `pickup_end`), hoặc store bấm "Không đến" | Giữ nguyên (đồ ăn đã để dành cho khách) |
 
+Sau `pickup_end`, cửa hàng **không** xác nhận nhận hàng được nữa (`confirm` trả `409`), và người mua cũng không huỷ được.
 `picked_up`, `cancelled`, `no_show` là trạng thái cuối, **không đổi tiếp**.
 
 ### 5.4 Mã nhận hàng
@@ -1182,3 +1194,4 @@ curl -X POST http://localhost:5000/api/orders \
 | Ngày | Thay đổi | Người sửa |
 |---|---|---|
 | 15/10/2026 | Bản v1 đầu tiên | VT1 |
+| 27/10/2026 | Quy tắc giờ "cuối ngày": đăng tin chỉ trong ngày hôm nay; người mua chỉ đặt trong `BOOKING_LEAD_MINUTES` phút trước giờ nhận (thêm `booking_opens_at`, `is_booking_open`); tự động chuyển đơn quá giờ sang `no_show`; `confirm` bị chặn sau `pickup_end` | VT1 |

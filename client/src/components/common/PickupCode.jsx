@@ -1,7 +1,8 @@
 // src/components/common/PickupCode.jsx
 import React, { useState } from 'react';
 
-export default function PickupCode({ code = 'LB-9482', expireTime = '21:30', className = '' }) {
+// expireDay: "hôm nay" hoặc "ngày 28/10" (đặt cho khung giờ ngày khác thì không được ghi "hôm nay").
+export default function PickupCode({ code = '', expireTime = '', expireDay = 'hôm nay', className = '' }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -30,7 +31,7 @@ export default function PickupCode({ code = 'LB-9482', expireTime = '21:30', cla
       </div>
 
       <p className="text-xs text-[#DC2626] font-semibold pt-0.5">
-        Hết hạn lúc: {expireTime} hôm nay
+        Hết hạn lúc: {expireTime} {expireDay}
       </p>
     </div>
   );

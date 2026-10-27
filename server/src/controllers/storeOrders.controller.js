@@ -81,10 +81,17 @@ const confirmOrder = asyncHandler(async (req, res) => {
   if (order.status === 'picked_up') throw new AppError('Đơn này đã được nhận trước đó', 409);
   if (order.status === 'cancelled') throw new AppError('Đơn này đã bị huỷ', 409);
   if (order.status === 'no_show') throw new AppError('Đơn này đã được đánh dấu không đến', 409);
+  // Quá giờ nhận thì không xác nhận được nữa (đơn sẽ được tự chuyển sang "không đến").
+  if (new Date(order.pickup_end).getTime() <= Date.now()) {
+    throw new AppError('Đã quá giờ nhận hàng, không thể xác nhận đơn này', 409);
+  }
 
-  // status = 'pending' trong câu UPDATE: nếu hai máy cùng bấm xác nhận, chỉ một máy thành công.
+  // status = 'pending' và còn trong giờ nhận nằm ngay trong câu UPDATE: nếu hai máy cùng bấm xác nhận,
+  // hoặc tác vụ tự động vừa đổi đơn sang "không đến", chỉ một bên thành công.
   const [updated] = await pool.query(
-    "UPDATE orders SET status = 'picked_up', picked_up_at = NOW() WHERE id = ? AND status = 'pending'",
+    `UPDATE orders o JOIN listings l ON l.id = o.listing_id
+     SET o.status = 'picked_up', o.picked_up_at = NOW()
+     WHERE o.id = ? AND o.status = 'pending' AND l.pickup_end > NOW()`,
     [order.id]
   );
   if (updated.affectedRows === 0) throw new AppError('Đơn này đã được xử lý trước đó', 409);

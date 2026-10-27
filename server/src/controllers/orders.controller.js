@@ -10,6 +10,7 @@ const { toPositiveInt, isIdParam } = require('../utils/parse');
 const { parsePagination, buildPagination } = require('../utils/pagination');
 const { generatePickupCode } = require('../utils/pickupCode');
 const { ORDER_SELECT, ORDER_STATUSES, formatOrder } = require('../utils/formatOrder');
+const { getBookingLeadMinutes, bookingOpensAt, formatClock } = require('../utils/timeRules');
 
 const MAX_QUANTITY_PER_ORDER = 5;
 const MAX_CODE_ATTEMPTS = 5;
@@ -38,6 +39,7 @@ const createOrder = asyncHandler(async (req, res) => {
   }
 
   // Transaction cần dùng CÙNG MỘT kết nối từ đầu đến cuối -> lấy riêng một kết nối từ pool.
+  const leadMinutes = getBookingLeadMinutes(); // số phút cho phép đặt trước giờ nhận
   const conn = await pool.getConnection();
   let orderId = null;
   try {
@@ -45,9 +47,11 @@ const createOrder = asyncHandler(async (req, res) => {
 
     // 1. Khoá dòng của tin (FOR UPDATE): người đặt khác phải chờ ta xong mới đọc/sửa được dòng này.
     const [listings] = await conn.query(
-      `SELECT id, store_id, status, sale_price, remaining, (pickup_end > NOW()) AS before_end
+      `SELECT id, store_id, status, sale_price, remaining, pickup_start,
+              (pickup_end > NOW()) AS before_end,
+              (DATE_SUB(pickup_start, INTERVAL ? MINUTE) <= NOW()) AS booking_open
        FROM listings WHERE id = ? FOR UPDATE`,
-      [listingId]
+      [leadMinutes, listingId]
     );
     const listing = listings[0];
     if (!listing || listing.status !== 'active') throw new AppError('Không tìm thấy suất ăn', 404);
@@ -57,6 +61,12 @@ const createOrder = asyncHandler(async (req, res) => {
 
     // 2. Các điều kiện đặt được (phân biệt rõ để báo đúng lý do)
     if (!listing.before_end) throw new AppError('Suất này đã hết giờ nhận', 409);
+    if (!listing.booking_open) {
+      throw new AppError(
+        `Suất này chưa mở đặt chỗ, bạn đặt được từ ${formatClock(bookingOpensAt(listing.pickup_start))}`,
+        409
+      );
+    }
     if (listing.remaining < quantity) {
       throw new AppError(
         listing.remaining === 0 ? 'Suất này đã hết' : `Không đủ suất, chỉ còn ${listing.remaining} suất`,
@@ -67,8 +77,9 @@ const createOrder = asyncHandler(async (req, res) => {
     // 3. Trừ suất. Điều kiện nằm ngay trong câu UPDATE = lớp bảo vệ thứ hai chống bán lố.
     const [updated] = await conn.query(
       `UPDATE listings SET remaining = remaining - ?
-       WHERE id = ? AND status = 'active' AND pickup_end > NOW() AND remaining >= ?`,
-      [quantity, listingId, quantity]
+       WHERE id = ? AND status = 'active' AND pickup_end > NOW()
+         AND DATE_SUB(pickup_start, INTERVAL ? MINUTE) <= NOW() AND remaining >= ?`,
+      [quantity, listingId, leadMinutes, quantity]
     );
     if (updated.affectedRows === 0) throw new AppError('Không đủ suất, vui lòng thử lại', 409);
 
