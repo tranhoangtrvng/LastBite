@@ -4,24 +4,24 @@ import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './components/common/Toast';
 import BuyerLayout from './layouts/BuyerLayout';
 import StoreLayout from './layouts/StoreLayout';
+import AdminLayout from './layouts/AdminLayout';
 import ProtectedRoute from './routes/ProtectedRoute';
 
-// Phân hệ Xác thực
+// 1. Phân hệ Xác thực
 import AuthPage from './pages/auth/AuthPage';
 
-// Phân hệ Người mua (Tất cả các trang chính thức)
+// 2. Phân hệ Người mua (Tất cả các trang chính thức)
 import SearchPage from './pages/buyer/SearchPage';
 import FoodDetailPage from './pages/buyer/FoodDetailPage';
 import OrderHistoryPage from './pages/buyer/OrderHistoryPage';
 import ProfilePage from './pages/buyer/ProfilePage';
 
-// Phân hệ Cửa hàng
+// 3. Phân hệ Cửa hàng (Đối tác)
 import StorePage from './pages/store/StorePage';
 import StoreDashboard from './components/store/StoreDashboard';
 import StoreOrders from './components/store/StoreOrders';
 
-// Phân hệ Admin
-import AdminLayout from './layouts/AdminLayout';
+// 4. Phân hệ Admin
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminStores from './pages/admin/AdminStores';
 import AdminUsers from './pages/admin/AdminUsers';
@@ -56,7 +56,7 @@ export default function App() {
                   <Route path="/orders" element={<OrderHistoryPage />} />
                 </Route>
 
-                {/* Trang Quản lý hồ sơ cá nhân (Frame 7) */}
+                {/* Trang Quản lý hồ sơ cá nhân (Frame 7): mọi vai trò đã đăng nhập */}
                 <Route path="/profile" element={<ProfilePage />} />
               </Route>
             </Route>
