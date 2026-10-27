@@ -13,8 +13,10 @@ export default function StoreLayout() {
     navigate('/auth');
   };
 
-  const displayName = user?.name || user?.email || '';
+  const displayName = user?.name || user?.email || 'Chủ quán';
+  const initial = displayName.charAt(0).toUpperCase();
 
+  // Menu chuẩn 3 tab quản lý nghiệp vụ, thông tin quán tích hợp vào Hồ sơ cá nhân
   const navLinks = [
     { name: 'Quản lý tin đăng', path: '/store' },
     { name: 'Quản lý đơn hàng', path: '/store/orders' },
@@ -35,7 +37,7 @@ export default function StoreLayout() {
               </span>
             </div>
 
-            {/* Menu chuyển tab cho Quán */}
+            {/* Menu chuyển tab */}
             <nav className="hidden md:flex items-center gap-2">
               {navLinks.map((link) => {
                 const isActive = location.pathname === link.path;
@@ -56,11 +58,26 @@ export default function StoreLayout() {
             </nav>
           </div>
 
+          {/* Cụm User & Hồ sơ */}
           <div className="flex items-center gap-3">
             <Link to="/foods" className="hidden sm:inline text-sm font-medium text-[#4B5563] hover:text-[#2563EB]">
               Xem trang người mua
             </Link>
-            <span className="hidden sm:inline text-sm font-medium text-[#374151]">{displayName}</span>
+
+            {/* Nút bấm vào Hồ sơ cá nhân & Thông tin cửa hàng */}
+            <Link
+              to="/profile"
+              className="flex items-center gap-2 group hover:text-[#2563EB] transition-colors"
+              title="Xem hồ sơ & thông tin quán"
+            >
+              <div className="w-8 h-8 rounded-full bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center font-bold text-xs border border-[#BFDBFE] group-hover:border-[#2563EB]">
+                {initial}
+              </div>
+              <span className="hidden sm:inline text-sm font-medium text-[#374151] group-hover:text-[#2563EB]">
+                {displayName}
+              </span>
+            </Link>
+
             <button
               onClick={handleLogout}
               className="text-xs font-semibold text-[#DC2626] bg-[#FEE2E2] hover:bg-[#FCA5A5] px-3 py-1.5 rounded-lg transition-colors cursor-pointer"

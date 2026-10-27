@@ -17,13 +17,9 @@ import OrderHistoryPage from './pages/buyer/OrderHistoryPage';
 // Phân hệ Cửa hàng
 import StorePage from './pages/store/StorePage';
 // Phân hệ Người mua (Tất cả các trang chính thức)
-import SearchPage from './pages/buyer/SearchPage';
-import FoodDetailPage from './pages/buyer/FoodDetailPage';
-import OrderHistoryPage from './pages/buyer/OrderHistoryPage';
 import ProfilePage from './pages/buyer/ProfilePage';
 
 // Phân hệ Cửa hàng
-import StorePage from './pages/store/StorePage';
 import StoreDashboard from './components/store/StoreDashboard';
 import StoreOrders from './components/store/StoreOrders';
 
@@ -79,8 +75,6 @@ export default function App() {
                 <Route path="/orders" element={<OrderHistoryPage />} />
               </Route>
 
-              {/* Trang Hồ sơ cá nhân (Frame 7) */}
-              <Route path="/profile" element={<DummyProfile />} />
               {/* Trang Quản lý hồ sơ cá nhân (Frame 7) */}
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
