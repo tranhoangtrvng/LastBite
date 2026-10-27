@@ -13,9 +13,11 @@ export default function PickupSuccessModal({
 }) {
   if (!bookingData) return null;
 
-  const expireTime = bookingData.pickupTimeRange 
-    ? bookingData.pickupTimeRange.split('-')[1]?.trim() 
-    : '21:30';
+  const expireTime = bookingData.pickupTimeRange
+    ? bookingData.pickupTimeRange.split('-')[1]?.trim() || ''
+    : '';
+  const expireDay =
+    bookingData.pickupToday === false ? `ngày ${bookingData.pickupDateLabel}` : 'hôm nay';
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[480px]">
@@ -34,21 +36,22 @@ export default function PickupSuccessModal({
         </div>
 
         {/* Nhúng Component PickupCode tại đây */}
-        <PickupCode 
-          code={bookingData.pickupCode || 'LB-9482'} 
-          expireTime={expireTime} 
+        <PickupCode
+          code={bookingData.pickupCode || ''}
+          expireTime={expireTime}
+          expireDay={expireDay}
         />
 
         {/* Danh sách tóm tắt thông tin nhận món */}
         <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg p-3 text-left text-xs text-[#374151] space-y-1.5">
           <p>• Suất ăn: <strong>{bookingData.title} × {bookingData.selectedQuantity || 1}</strong></p>
-          <p>• Địa chỉ: {bookingData.storeAddress || '123 Chùa Láng, Đống Đa, Hà Nội'}</p>
-          <p>• Thanh toán tại quầy: <strong className="text-[#2563EB]">{(bookingData.totalPrice || 20000).toLocaleString('vi-VN')}đ</strong></p>
+          <p>• Địa chỉ: {bookingData.storeAddress}</p>
+          <p>• Thanh toán tiền mặt tại quầy: <strong className="text-[#2563EB]">{Number(bookingData.totalPrice || 0).toLocaleString('vi-VN')}đ</strong></p>
         </div>
 
-        {/* Cảnh báo tự hủy đơn */}
+        {/* Lưu ý quá giờ: server tự chuyển đơn sang "Không đến" (không phải "hủy", suất không được trả lại) */}
         <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800 text-left">
-          ⚠️ Quán chỉ giữ món trong khung giờ hẹn. Đơn sẽ tự hủy nếu bạn không đến nhận trước giờ hẹn.
+          ⚠️ Quán chỉ giữ món trong khung giờ hẹn. Quá giờ mà bạn chưa đến nhận, đơn sẽ tự chuyển sang "Không đến" và bạn không thể nhận món nữa. Muốn bỏ đơn, hãy hủy trước giờ nhận.
         </div>
 
         {/* Cặp nút điều hướng chân modal */}

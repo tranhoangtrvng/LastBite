@@ -14,11 +14,12 @@ export default function BuyerLayout() {
   };
 
   // Khách chưa đăng nhập và người mua thấy menu người mua; cửa hàng có thêm lối về khu quản lý của mình
-  // (giao diện admin do VT4 làm, có thì thêm lại link /admin ở đây).
+  // và admin có lối về trang quản trị.
   const navLinks = [
     { name: 'Trang chủ', path: '/foods' },
     ...(!user || user.role === 'buyer' ? [{ name: 'Đơn hàng của tôi', path: '/orders' }] : []),
     ...(user?.role === 'store' ? [{ name: 'Quản lý cửa hàng', path: '/store' }] : []),
+    ...(user?.role === 'admin' ? [{ name: 'Trang quản trị', path: '/admin' }] : []),
   ];
 
   const displayName = user?.name || user?.email || '';

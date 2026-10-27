@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { orderApi } from '../../api/orderApi';
 import { toOrderItem } from '../../utils/mappers';
 import { formatMoney, PLACEHOLDER_IMAGE } from '../../utils/format';
+import useNow from '../../utils/useNow';
+import useRefreshOnFocus from '../../utils/useRefreshOnFocus';
 
 // 5 Tab trạng thái theo đúng thiết kế Frame 6 trên Figma
 const TABS = [
@@ -17,6 +19,7 @@ const TABS = [
 
 export default function OrderHistoryPage() {
   const navigate = useNavigate();
+  const now = useNow(); // để biết đơn nào đã quá giờ nhận
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -46,6 +49,9 @@ export default function OrderHistoryPage() {
       cancelled = true;
     };
   }, [reloadKey]);
+
+  // Quay lại tab (hoặc mỗi phút) thì tải lại ngầm: đơn quá giờ sẽ tự chuyển sang "Không đến"
+  useRefreshOnFocus(() => setReloadKey((k) => k + 1));
 
   // Đếm số lượng đơn tương ứng cho từng tab
   const counts = useMemo(() => {
@@ -141,6 +147,8 @@ export default function OrderHistoryPage() {
           filteredOrders.map((order) => {
             const isPending = order.status === 'PENDING';
             const isCompleted = order.status === 'COMPLETED';
+            // Đang chờ nhận nhưng đã quá giờ nhận: không huỷ được nữa, server sắp chuyển sang "Không đến"
+            const isOverdue = isPending && order.pickupEnd && new Date(order.pickupEnd).getTime() <= now;
 
             return (
               <div
@@ -158,9 +166,14 @@ export default function OrderHistoryPage() {
                     </span>
 
                     {/* Badge trạng thái */}
-                    {isPending && (
+                    {isPending && !isOverdue && (
                       <span className="bg-[#FEF08A] text-[#854D0E] text-[11px] font-semibold px-2.5 py-0.5 rounded-full shrink-0">
                         Đang chờ nhận
+                      </span>
+                    )}
+                    {isOverdue && (
+                      <span className="bg-gray-100 text-[#4B5563] text-[11px] font-semibold px-2.5 py-0.5 rounded-full shrink-0">
+                        Quá giờ nhận
                       </span>
                     )}
                     {isCompleted && (
@@ -204,10 +217,20 @@ export default function OrderHistoryPage() {
                           <p className="text-[#4B5563]">
                             Nhận trước: {order.pickupTime}
                           </p>
-                          <p className="text-[#4B5563]">
-                            Mã: <strong className="font-bold text-[#111827]">{order.code}</strong>
-                          </p>
+                          {isOverdue ? (
+                            <p className="text-[#B45309] font-medium">
+                              Đã quá giờ nhận, đơn sẽ được ghi nhận là "Không đến".
+                            </p>
+                          ) : (
+                            <p className="text-[#4B5563]">
+                              Mã: <strong className="font-bold text-[#111827]">{order.code}</strong>
+                            </p>
+                          )}
                         </>
+                      )}
+
+                      {order.status === 'NO_SHOW' && (
+                        <p className="text-[#6B7280]">Quá giờ nhận ({order.pickupTime}) mà chưa đến lấy món.</p>
                       )}
 
                       {isCompleted && (
@@ -228,7 +251,7 @@ export default function OrderHistoryPage() {
 
                 {/* Nút hành động Full-width chân thẻ */}
                 <div>
-                  {isPending ? (
+                  {isPending && !isOverdue ? (
                     <button
                       type="button"
                       onClick={() => setOrderToCancel(order)}

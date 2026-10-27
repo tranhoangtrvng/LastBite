@@ -12,3 +12,4 @@ export { default as SearchBar } from './SearchBar';
 export { default as SortDropdown } from './SortDropdown';
 export { default as FilterSidebar } from './FilterSidebar';
 export { default as Pagination } from './Pagination';
+export { ToastProvider, useToast } from './Toast';

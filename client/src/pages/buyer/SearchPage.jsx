@@ -1,5 +1,5 @@
 // client/src/pages/buyer/SearchPage.jsx
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   SearchBar,
@@ -16,6 +16,8 @@ import { categoryApi } from '../../api/categoryApi';
 import { orderApi } from '../../api/orderApi';
 import { toFoodItem, toPickupModalData } from '../../utils/mappers';
 import { isoTime } from '../../utils/format';
+import useNow from '../../utils/useNow';
+import useRefreshOnFocus from '../../utils/useRefreshOnFocus';
 
 const PAGE_SIZE = 12;
 
@@ -38,6 +40,7 @@ const EMPTY_FILTERS = { categories: [], priceRange: 'all', pickupTimes: [] };
 export default function SearchPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const now = useNow(); // đồng hồ chạy: ẩn suất hết giờ và đếm ngược mà không cần tải lại trang
 
   const [keyword, setKeyword] = useState('');
   const [sortBy, setSortBy] = useState('newest');
@@ -50,6 +53,13 @@ export default function SearchPage() {
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0); // tăng lên để tải lại danh sách (sau khi đặt chỗ)
   const [categoryOptions, setCategoryOptions] = useState([]);
+  // true khi lần tải tới là "tải ngầm" (quay lại tab, mỗi phút, sau khi đặt chỗ): giữ nguyên danh sách đang hiện,
+  // không nháy chữ "Đang tải..." và không báo lỗi.
+  const silentRef = useRef(false);
+  const reloadSilently = () => {
+    silentRef.current = true;
+    setReloadKey((k) => k + 1);
+  };
 
   // State quản lý luồng Modal đặt chỗ & Modal mã đối soát 6 ký tự
   const [selectedItem, setSelectedItem] = useState(null);
@@ -69,28 +79,38 @@ export default function SearchPage() {
   // và sắp xếp xử lý ở trình duyệt trên tối đa 50 suất đã tải (đủ cho quy mô bài tập lớn).
   useEffect(() => {
     let cancelled = false;
+    const silent = silentRef.current;
+    silentRef.current = false;
     const timer = setTimeout(async () => {
-      setLoading(true);
-      setLoadError('');
+      if (!silent) {
+        setLoading(true);
+        setLoadError('');
+      }
       try {
         const params = { limit: 50, ...(PRICE_PARAMS[filters.priceRange] || {}) };
         if (keyword.trim()) params.q = keyword.trim();
         const res = await listingApi.getListings(params);
-        if (!cancelled) setFoods(res.data.map(toFoodItem));
-      } catch (err) {
         if (!cancelled) {
+          setFoods(res.data.map(toFoodItem));
+          setLoadError('');
+        }
+      } catch (err) {
+        if (!cancelled && !silent) {
           setFoods([]);
           setLoadError(err.message);
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
-    }, keyword ? 350 : 0); // đợi người dùng gõ xong mới gọi server
+    }, keyword && !silent ? 350 : 0); // đợi người dùng gõ xong mới gọi server
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
   }, [keyword, filters.priceRange, reloadKey]);
+
+  // Quay lại tab (hoặc mỗi phút) thì tải lại ngầm để danh sách luôn mới
+  useRefreshOnFocus(reloadSilently);
 
   // Đổi bộ lọc / từ khóa / cách sắp xếp thì quay về trang 1
   useEffect(() => {
@@ -99,7 +119,8 @@ export default function SearchPage() {
 
   // ==================== LOGIC XỬ LÝ DỮ LIỆU (SEARCH / FILTER / SORT) ====================
   const processedFoods = useMemo(() => {
-    let result = [...foods];
+    // Suất đã hết giờ nhận biến mất ngay khi tới giờ, không chờ lần tải tiếp theo
+    let result = foods.filter((item) => new Date(item.pickupEnd).getTime() > now);
 
     // 1. Lọc danh mục
     if (filters.categories && filters.categories.length > 0) {
@@ -129,7 +150,7 @@ export default function SearchPage() {
     }
 
     return result;
-  }, [foods, filters, sortBy]);
+  }, [foods, filters, sortBy, now]);
 
   const totalPages = Math.max(1, Math.ceil(processedFoods.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -153,10 +174,10 @@ export default function SearchPage() {
       const res = await orderApi.createOrder(selectedItem.id, bookingInfo.selectedQuantity || 1);
       setPickupCodeData(toPickupModalData(res.data));
       setSelectedItem(null); // Đóng BookingModal
-      setReloadKey((k) => k + 1); // cập nhật lại số suất còn lại
+      reloadSilently(); // cập nhật lại số suất còn lại
     } catch (err) {
       setBookingError(err.message);
-      if (err.status === 409) setReloadKey((k) => k + 1); // hết suất / hết giờ: làm mới danh sách
+      if (err.status === 409) reloadSilently(); // hết suất / hết giờ / chưa mở đặt: làm mới danh sách
     } finally {
       setBookingBusy(false);
     }
@@ -218,6 +239,7 @@ export default function SearchPage() {
                 <FoodCard
                   key={item.id}
                   item={item}
+                  now={now}
                   onCardClick={(f) => navigate(`/foods/${f.id}`)}
                   onBookNow={handleBookNow}
                 />
