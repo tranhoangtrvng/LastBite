@@ -6,12 +6,15 @@ import { useAuth } from '../../context/AuthContext';
 import { listingApi } from '../../api/listingApi';
 import { orderApi } from '../../api/orderApi';
 import { toFoodItem, toPickupModalData } from '../../utils/mappers';
-import { formatMoney, PLACEHOLDER_IMAGE } from '../../utils/format';
+import { formatMoney, PLACEHOLDER_IMAGE, describePickupTiming, isoTime } from '../../utils/format';
+import useNow from '../../utils/useNow';
+import useRefreshOnFocus from '../../utils/useRefreshOnFocus';
 
 export default function FoodDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const now = useNow(); // đồng hồ chạy để đếm ngược / khoá nút khi hết giờ
 
   const [food, setFood] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +49,9 @@ export default function FoodDetailPage() {
     };
   }, [id, reloadKey]);
 
+  // Quay lại tab (hoặc mỗi phút) thì tải lại để số suất còn lại luôn mới
+  useRefreshOnFocus(() => setReloadKey((k) => k + 1));
+
   if (loading) {
     return (
       <div className="bg-white p-12 text-center rounded-xl border border-[#E5E7EB]">
@@ -66,10 +72,17 @@ export default function FoodDetailPage() {
   }
 
   const discountPercent = food.discountPercent;
-  // Hết suất, hoặc đã quá giờ nhận: khoá nút đặt chỗ
-  const isSoldOut = food.quantity <= 0;
-  const isUnavailable = isSoldOut || !food.isAvailable;
-  const unavailableLabel = isSoldOut ? 'Đã hết suất' : 'Đã hết giờ nhận';
+  // Khoá nút đặt chỗ khi: đã quá giờ nhận (tính theo đồng hồ chạy, không chờ tải lại), hết suất,
+  // hoặc chưa tới giờ mở đặt (chỉ đặt được trong khoảng ngắn trước giờ bắt đầu nhận).
+  const timing = describePickupTiming(food.pickupStart, food.pickupEnd, now);
+  const isEnded = timing.phase === 'ended' || (!food.isAvailable && food.quantity > 0);
+  const isSoldOut = !isEnded && food.quantity <= 0;
+  const opensAtMs = food.bookingOpensAt ? new Date(food.bookingOpensAt).getTime() : 0;
+  const notOpenYet = !isEnded && !isSoldOut && now < opensAtMs;
+  const isUnavailable = isEnded || isSoldOut || notOpenYet;
+  const unavailableLabel = isEnded ? 'Đã hết giờ nhận' : isSoldOut ? 'Đã hết suất' : 'Chưa mở đặt chỗ';
+  const buttonLabel = isEnded ? 'ĐÃ HẾT GIỜ NHẬN' : isSoldOut ? 'HẾT SUẤT' : 'CHƯA MỞ ĐẶT CHỖ';
+  const opensAtLabel = food.bookingOpensAt ? isoTime(food.bookingOpensAt) : '';
 
   // 1. Mở modal đặt chỗ (chưa đăng nhập thì chuyển sang trang đăng nhập)
   const handleOpenBooking = () => {
@@ -121,7 +134,7 @@ export default function FoodDetailPage() {
               src={food.imageUrl}
               alt={food.title}
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = PLACEHOLDER_IMAGE; }}
-              className="w-full h-full object-cover"
+              className={`w-full h-full object-cover ${isEnded ? 'grayscale opacity-70' : ''}`}
             />
           </div>
 
@@ -185,8 +198,30 @@ export default function FoodDetailPage() {
               </span>
             </div>
 
+            {/* Đếm ngược theo giờ nhận hàng */}
+            {!isEnded && (
+              <p
+                className={`text-sm font-semibold ${
+                  timing.phase === 'ending' ? 'text-[#DC2626]' : 'text-[#EA580C]'
+                }`}
+              >
+                ⏳ {timing.label}
+              </p>
+            )}
+
+            {isEnded && (
+              <p className="text-sm text-[#4B5563] bg-gray-100 border border-gray-200 rounded-lg px-3 py-2">
+                Suất ăn này đã hết giờ nhận nên không đặt được nữa. Hãy xem các suất khác đang mở.
+              </p>
+            )}
+            {notOpenYet && (
+              <p className="text-sm text-[#1D4ED8] bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                Suất này mở đặt chỗ lúc <strong>{opensAtLabel}</strong>, gần giờ nhận hàng. Bạn quay lại sau nhé.
+              </p>
+            )}
+
             <p className="text-xs text-[#DC2626] leading-relaxed font-medium">
-              ⚠️ Lưu ý: Thanh toán trực tiếp tại quầy bằng tiền mặt hoặc quét mã QR khi nhận đồ. Không thu tiền online.
+              ⚠️ Lưu ý: Thanh toán bằng tiền mặt trực tiếp tại quầy khi nhận đồ. Không thu tiền online.
             </p>
 
             {/* Nút hành động */}
@@ -196,7 +231,7 @@ export default function FoodDetailPage() {
                 disabled
                 className="w-full py-3.5 px-4 bg-gray-200 text-gray-400 font-bold text-sm rounded-xl cursor-not-allowed text-center uppercase tracking-wide"
               >
-                {isSoldOut ? 'HẾT SUẤT' : 'ĐÃ HẾT GIỜ NHẬN'}
+                {buttonLabel}
               </button>
             ) : (
               <button

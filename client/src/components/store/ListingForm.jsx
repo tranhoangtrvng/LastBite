@@ -290,6 +290,10 @@ export default function ListingForm({ initialData = null, onSuccess, onCancel })
           error={errors.pickup_end?.message}
         />
       </div>
+      <p className="text-xs text-gray-500 -mt-2">
+        Chỉ đăng suất nhận hàng trong ngày hôm nay (giờ kết thúc trước 24:00). Người mua chỉ đặt chỗ được khi gần
+        đến giờ bắt đầu nhận.
+      </p>
 
       {/* Nút hành động */}
       <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-6">

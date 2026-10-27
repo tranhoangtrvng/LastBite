@@ -26,9 +26,6 @@ export function formatMoney(value) {
   return `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 }
 
-// Tên cũ do nhánh buyer-profile dùng, giữ lại để code cũ không bị lỗi. Cùng kết quả với formatMoney.
-export const formatCurrency = formatMoney;
-
 // Ngày hôm nay theo máy người dùng, dạng "YYYY-MM-DD" (dùng để so với phần ngày của chuỗi ISO).
 export function todayString() {
   const now = new Date();
@@ -57,6 +54,33 @@ export const formatTimeRange = (startTime, endTime) => {
   if (!startTime || !endTime) return 'Trong ngày';
   return `${startTime} - ${endTime}`;
 };
+
+// Đổi số mili-giây thành chữ dễ đọc: "25 phút", "1 giờ 20 phút", "2 giờ".
+export function formatDuration(ms) {
+  const minutes = Math.max(1, Math.ceil(ms / 60000));
+  if (minutes < 60) return `${minutes} phút`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? `${h} giờ ${m} phút` : `${h} giờ`;
+}
+
+// Mô tả thời điểm hiện tại so với khung giờ nhận hàng (dùng cho nhãn đếm ngược).
+// Trả về { phase: 'upcoming' | 'open' | 'ending' | 'ended', label }.
+//   upcoming: chưa tới giờ nhận      open: đang trong giờ nhận
+//   ending:   còn <= 30 phút         ended: đã hết giờ nhận
+export function describePickupTiming(startIso, endIso, now = Date.now()) {
+  const start = new Date(startIso).getTime();
+  const end = new Date(endIso).getTime();
+  if (Number.isNaN(end) || now >= end) return { phase: 'ended', label: 'Đã hết giờ nhận' };
+  if (!Number.isNaN(start) && now < start) {
+    return { phase: 'upcoming', label: `Bắt đầu nhận sau ${formatDuration(start - now)}` };
+  }
+  const left = end - now;
+  return {
+    phase: left <= 30 * 60000 ? 'ending' : 'open',
+    label: `Còn ${formatDuration(left)} để nhận`,
+  };
+}
 
 // "HH:mm - dd/MM/yyyy" (hiển thị giờ nhận hàng của đơn đã hoàn tất)
 export function formatDateTime(iso) {

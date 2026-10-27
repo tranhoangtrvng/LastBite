@@ -31,6 +31,8 @@ export function toFoodItem(listing) {
     categoryId: listing.category?.id ?? null,
     imageUrl: resolveImageUrl(listing.image_url),
     isAvailable: listing.is_available,
+    bookingOpensAt: listing.booking_opens_at || null, // người mua đặt được từ mốc này
+    isBookingOpen: listing.is_booking_open !== false,
     createdAt: listing.created_at,
   };
 }
@@ -54,6 +56,8 @@ export function toOrderItem(order) {
     foodId: order.listing?.id,
     title: order.listing?.title || '',
     quantity: order.quantity,
+    pickupStart: order.listing?.pickup_start || null,
+    pickupEnd: end || null,
     pickupTime: end ? `${isoTime(end)} ${isToday(end) ? 'hôm nay' : `ngày ${shortDate(end)}`}` : '',
     completedTime: formatDateTime(order.picked_up_at),
     totalPrice: order.total_price,

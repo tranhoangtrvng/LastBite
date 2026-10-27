@@ -76,7 +76,7 @@ export default function BookingModal({ isOpen, onClose, item, onConfirm, isSubmi
         {/* Lưu ý nhận món[cite: 13] */}
         <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-900 leading-relaxed">
           ℹ️ Vui lòng đến nhận hàng đúng khung giờ <strong>{item.pickupTimeRange}</strong>
-          {item.pickupToday === false && <> (ngày <strong>{item.pickupDateLabel}</strong>)</>}. Đơn hàng sẽ thanh toán trực tiếp tại quầy bằng tiền mặt hoặc chuyển khoản QR khi nhận đồ.
+          {item.pickupToday === false && <> (ngày <strong>{item.pickupDateLabel}</strong>)</>}. Đơn hàng thanh toán bằng tiền mặt trực tiếp tại quầy khi nhận đồ (không thanh toán online).
         </div>
 
         {/* Lỗi từ server (hết suất, hết giờ nhận...) */}

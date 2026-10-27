@@ -10,4 +10,10 @@ export const authApi = {
 
   // Lấy thông tin tài khoản hiện tại qua JWT Token
   getProfile: () => axiosClient.get('/auth/me'),
+
+  // Sửa hồ sơ: chỉ đổi được name và phone (email, role bị server bỏ qua)
+  updateMe: (data) => axiosClient.put('/auth/me', data),
+
+  // Đổi mật khẩu: { current_password, new_password }. Sai mật khẩu hiện tại trả 400.
+  changePassword: (data) => axiosClient.put('/auth/password', data),
 };

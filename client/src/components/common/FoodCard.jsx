@@ -1,10 +1,14 @@
 // src/components/common/FoodCard.jsx
 import React from 'react';
 import Badge from './Badge';
-import { PLACEHOLDER_IMAGE, formatMoney } from '../../utils/format';
+import { PLACEHOLDER_IMAGE, formatMoney, describePickupTiming } from '../../utils/format';
 
-export default function FoodCard({ item = {}, onBookNow, onCardClick }) {
+// now: thời điểm hiện tại (mili-giây) do trang cha cập nhật định kỳ, để nhãn đếm ngược tự chạy.
+export default function FoodCard({ item = {}, now = Date.now(), onBookNow, onCardClick }) {
   const soldOut = Number(item.quantity) === 0;
+  const timing = describePickupTiming(item.pickupStart, item.pickupEnd, now);
+  const ended = timing.phase === 'ended';
+  const disabled = soldOut || ended;
 
   return (
     <div
@@ -20,7 +24,7 @@ export default function FoodCard({ item = {}, onBookNow, onCardClick }) {
           className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
         />
         <div className="absolute top-2.5 left-2.5">
-          <Badge type="stock" count={item.quantity} />
+          <Badge type="stock" status={item.quantity} />
         </div>
       </div>
 
@@ -35,10 +39,20 @@ export default function FoodCard({ item = {}, onBookNow, onCardClick }) {
           </p>
         </div>
 
-        <p className="text-xs text-[#EA580C] font-medium flex items-center gap-1">
-          <span>🕒</span>
-          <span>{item.pickupTimeRange}</span>
-        </p>
+        <div>
+          <p className="text-xs text-[#EA580C] font-medium flex items-center gap-1">
+            <span>🕒</span>
+            <span>{item.pickupTimeRange}</span>
+          </p>
+          {/* Đếm ngược: còn bao lâu để nhận (đỏ khi sắp hết giờ) */}
+          <p
+            className={`text-[11px] mt-0.5 pl-5 ${
+              timing.phase === 'ending' || ended ? 'text-[#DC2626] font-semibold' : 'text-[#6B7280]'
+            }`}
+          >
+            {timing.label}
+          </p>
+        </div>
 
         {/* Hàng giá & nút Đặt chỗ */}
         <div className="pt-1 flex items-center justify-between">
@@ -55,14 +69,14 @@ export default function FoodCard({ item = {}, onBookNow, onCardClick }) {
 
           <button
             type="button"
-            disabled={soldOut}
+            disabled={disabled}
             onClick={(e) => {
               e.stopPropagation();
               if (onBookNow) onBookNow(item);
             }}
             className="px-3 py-1.5 bg-[#2563EB] hover:bg-[#1D4ED8] disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-md shadow-sm transition cursor-pointer"
           >
-            {soldOut ? 'Hết hàng' : 'Đặt chỗ'}
+            {ended ? 'Hết giờ' : soldOut ? 'Hết hàng' : 'Đặt chỗ'}
           </button>
         </div>
       </div>

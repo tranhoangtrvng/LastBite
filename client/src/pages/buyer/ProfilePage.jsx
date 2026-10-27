@@ -2,24 +2,26 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { authApi } from '../../api/authApi';
 import { storeApi } from '../../api/storeApi';
+import { orderApi } from '../../api/orderApi';
+import { formatMoney } from '../../utils/format';
 import Input from '../../components/common/Input';
+
+const ROLE_LABELS = { buyer: 'Người mua', store: 'Cửa hàng', admin: 'Quản trị viên' };
+const PHONE_REGEX = /^\d{9,11}$/;
+
+const normalizePhone = (value) => {
+  const compact = (value || '').replace(/[\s.-]/g, '');
+  return compact.startsWith('+84') ? '0' + compact.slice(3) : compact;
+};
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-
+  const { user, logout, refreshUser } = useAuth();
   const isStore = user?.role === 'store';
 
-  // State thông tin tài khoản cá nhân
-  const [profileData, setProfileData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    role: isStore ? 'Chủ cửa hàng' : 'Khách hàng',
-  });
-
-  // State thông tin cửa hàng (dành riêng cho role 'store')
+  // --- 1. STATE & LOGIC THÔNG TIN CỬA HÀNG (Dành riêng cho role 'store') ---
   const [storeData, setStoreData] = useState({
     name: '',
     address: '',
@@ -29,7 +31,6 @@ export default function ProfilePage() {
     longitude: '',
     status: '',
   });
-
   const [loadingStore, setLoadingStore] = useState(isStore);
   const [storeSaving, setStoreSaving] = useState(false);
   const [storeMessage, setStoreMessage] = useState({ type: '', text: '' });
@@ -106,56 +107,185 @@ export default function ProfilePage() {
         }));
         setStoreMessage({ type: 'success', text: '📍 Đã lấy toạ độ GPS hiện tại thành công!' });
       },
-      (err) => {
+      () => {
         alert('Không thể lấy vị trí. Vui lòng cấp quyền định vị trong trình duyệt.');
       }
     );
   };
 
+  // --- 2. STATE & LOGIC THÔNG TIN TÀI KHOẢN (MODAL 1: CHỈNH SỬA HỒ SƠ) ---
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [editForm, setEditForm] = useState({ name: user?.name || '', phone: user?.phone || '' });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState('');
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setProfileError('');
+    const cleanName = editForm.name.trim();
+    const cleanPhone = normalizePhone(editForm.phone);
+
+    if (cleanName.length < 2) {
+      setProfileError('Tên phải từ 2 ký tự trở lên.');
+      return;
+    }
+    if (cleanPhone && !PHONE_REGEX.test(cleanPhone)) {
+      setProfileError('Số điện thoại không hợp lệ (cần 9 đến 11 chữ số).');
+      return;
+    }
+
+    try {
+      setProfileSaving(true);
+      await authApi.updateMe?.({ name: cleanName, phone: cleanPhone || null });
+      if (refreshUser) await refreshUser();
+      setIsEditingInfo(false);
+    } catch (err) {
+      setProfileError(err.message || 'Lỗi khi cập nhật hồ sơ');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  // --- 3. STATE & LOGIC ĐỔI MẬT KHẨU (MODAL 2) ---
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+
+  const handlePasswordChange = (field, value) => {
+    const cleanValue = value.trim().slice(0, 32);
+    setPasswordForm((prev) => ({ ...prev, [field]: cleanValue }));
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordError('Mật khẩu mới phải có ít nhất 6 ký tự.');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+
+    try {
+      setPasswordSaving(true);
+      await authApi.changePassword?.({
+        current_password: passwordForm.currentPassword,
+        new_password: passwordForm.newPassword,
+      });
+      setPasswordSuccess('Đổi mật khẩu thành công!');
+      setTimeout(() => {
+        setIsChangingPassword(false);
+        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        setPasswordSuccess('');
+      }, 1200);
+    } catch (err) {
+      setPasswordError(err.message || 'Lỗi khi đổi mật khẩu.');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
+  // --- 4. THỐNG KÊ NGƯỜI MUA & THIẾT LẬP ---
+  const [stats, setStats] = useState({ meals: 5, saved_money: 125000 });
+  const [remindPickup, setRemindPickup] = useState(true);
+
+  useEffect(() => {
+    if (user?.role === 'buyer' && orderApi?.getMyStats) {
+      orderApi
+        .getMyStats()
+        .then((res) => {
+          if (res.data) setStats(res.data);
+        })
+        .catch(() => {});
+    }
+  }, [user]);
+
   // Đăng xuất
   const handleLogout = () => {
-    if (window.confirm('Bạn có chắc chắn muốn đăng xuất?')) {
+    if (window.confirm('Bạn có chắc chắn muốn đăng xuất tài khoản?')) {
       logout();
       navigate('/auth');
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 space-y-8">
+    <div className="max-w-6xl mx-auto py-10 px-4 sm:px-6">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
         
-        {/* CỘT TRÁI: THẺ THÔNG TIN TÀI KHOẢN (4 CỘT) */}
+        {/* CỘT TRÁI: THẺ THÔNG TIN CÁ NHÂN (4 CỘT) */}
         <div className="md:col-span-4 bg-white rounded-2xl border border-[#E5E7EB] p-6 shadow-sm flex flex-col items-center text-center">
           <div className="w-20 h-20 rounded-2xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center font-bold text-3xl mb-4 border border-[#BFDBFE]">
-            {profileData.name.charAt(0).toUpperCase() || 'U'}
+            {user?.name?.charAt(0).toUpperCase() || 'U'}
           </div>
 
-          <h2 className="text-lg font-bold text-[#111827]">{profileData.name}</h2>
-          <span className="inline-block px-2.5 py-0.5 mt-1 text-xs font-semibold rounded-full bg-blue-50 text-[#2563EB] border border-blue-200">
-            {profileData.role}
-          </span>
-
-          <div className="space-y-2 text-left w-full mt-6 px-2 text-sm text-[#374151]">
+          <div className="space-y-1.5 text-left w-full px-2 text-sm text-[#111827]">
             <p>
-              <span className="font-semibold text-gray-500">Email:</span> {profileData.email}
+              <span className="font-semibold text-gray-500">Tên tài khoản:</span> {user?.name || 'Chưa đặt tên'}
             </p>
             <p>
-              <span className="font-semibold text-gray-500">Số điện thoại:</span> {profileData.phone || 'Chưa cập nhật'}
+              <span className="font-semibold text-gray-500">Email:</span> {user?.email}
+            </p>
+            <p>
+              <span className="font-semibold text-gray-500">Số điện thoại:</span> {user?.phone || 'Chưa cập nhật'}
+            </p>
+            <p>
+              <span className="font-semibold text-gray-500">Vai trò:</span>{' '}
+              <span className="font-medium text-[#2563EB]">
+                {ROLE_LABELS[user?.role] || user?.role || 'Người mua'}
+              </span>
             </p>
           </div>
 
           <hr className="w-full my-6 border-[#E5E7EB]" />
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="w-full py-2.5 px-4 rounded-xl border border-[#DC2626] text-[#DC2626] text-sm font-medium hover:bg-red-50 transition cursor-pointer"
-          >
-            Đăng xuất
-          </button>
+          {/* 3 Nút bấm viền đúng Figma */}
+          <div className="w-full space-y-3">
+            <button
+              type="button"
+              onClick={() => {
+                setEditForm({ name: user?.name || '', phone: user?.phone || '' });
+                setProfileError('');
+                setIsEditingInfo(true);
+              }}
+              className="w-full py-2.5 px-4 rounded-xl border border-[#2563EB] text-[#2563EB] text-sm font-medium hover:bg-blue-50 transition cursor-pointer"
+            >
+              Chỉnh sửa thông tin
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setPasswordError('');
+                setPasswordSuccess('');
+                setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                setIsChangingPassword(true);
+              }}
+              className="w-full py-2.5 px-4 rounded-xl border border-[#2563EB] text-[#2563EB] text-sm font-medium hover:bg-blue-50 transition cursor-pointer"
+            >
+              Đổi mật khẩu
+            </button>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-full py-2.5 px-4 rounded-xl border border-[#DC2626] text-[#DC2626] text-sm font-medium hover:bg-red-50 transition cursor-pointer"
+            >
+              Đăng xuất
+            </button>
+          </div>
         </div>
 
-        {/* CỘT PHẢI: THÔNG TIN CỬA HÀNG HOẶC THỐNG KÊ NGƯỜI MUA (8 CỘT) */}
+        {/* CỘT PHẢI: FORM CỬA HÀNG (role store) HOẶC THỐNG KÊ (role buyer) */}
         <div className="md:col-span-8 bg-white rounded-2xl border border-[#E5E7EB] p-8 shadow-sm">
           {isStore ? (
             /* KHỐI QUẢN LÝ THÔNG TIN CỬA HÀNG */
@@ -281,23 +411,181 @@ export default function ProfilePage() {
               )}
             </div>
           ) : (
-            /* KHỐI THỐNG KÊ CHO NGƯỜI MUA */
-            <div>
-              <h3 className="text-base font-bold text-[#111827] mb-4">Tác động giải cứu cùng LastBite</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
-                  <div className="text-2xl font-bold text-[#16A34A]">5 suất ăn</div>
-                  <p className="text-xs text-[#6B7280] mt-1">Đã giải cứu thành công</p>
+            /* KHỐI CHO NGƯỜI MUA */
+            <div className="space-y-8">
+              <div>
+                <h3 className="text-base font-bold text-[#111827] mb-4">
+                  Tác động giải cứu cùng LastBite
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
+                    <div className="text-2xl font-bold text-[#16A34A]">
+                      {stats.meals} suất ăn
+                    </div>
+                    <p className="text-xs text-[#6B7280] mt-1">Đã giải cứu thành công</p>
+                  </div>
+
+                  <div className="p-5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
+                    <div className="text-2xl font-bold text-[#2563EB]">
+                      {formatMoney ? formatMoney(stats.saved_money) : `${(stats.saved_money || 0).toLocaleString()}đ`}
+                    </div>
+                    <p className="text-xs text-[#6B7280] mt-1">Chi phí tiết kiệm được</p>
+                  </div>
                 </div>
-                <div className="p-5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
-                  <div className="text-2xl font-bold text-[#2563EB]">125.000đ</div>
-                  <p className="text-xs text-[#6B7280] mt-1">Chi phí tiết kiệm được</p>
+              </div>
+
+              <div>
+                <h3 className="text-base font-bold text-[#111827] mb-4">Thiết lập</h3>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-[#111827]">
+                      Nhắc nhở nhận món trước giờ hẹn
+                    </p>
+                    <p className="text-xs text-[#6B7280] mt-0.5">
+                      Thông báo trước 30 phút để tránh bị huỷ đơn do quá hạn
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRemindPickup(!remindPickup)}
+                    className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-200 ease-in-out ${
+                      remindPickup ? 'bg-[#16A34A]' : 'bg-[#E5E7EB]'
+                    }`}
+                  >
+                    <div
+                      className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
+                        remindPickup ? 'translate-x-6' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* MODAL 1: CHỈNH SỬA THÔNG TIN */}
+      {isEditingInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl animate-fade-in">
+            <h3 className="text-lg font-bold text-[#111827] mb-4">Chỉnh sửa thông tin</h3>
+
+            {profileError && (
+              <div className="mb-4 p-2.5 bg-red-50 text-red-600 text-xs rounded-lg border border-red-200">
+                ⚠️ {profileError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <Input
+                label="Tên tài khoản *"
+                id="edit-name"
+                required
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              />
+
+              <Input
+                label="Số điện thoại"
+                id="edit-phone"
+                value={editForm.phone}
+                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+              />
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingInfo(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50 cursor-pointer"
+                >
+                  Huỷ
+                </button>
+                <button
+                  type="submit"
+                  disabled={profileSaving}
+                  className="px-4 py-2 bg-[#2563EB] text-white rounded-xl text-sm font-medium hover:bg-blue-700 cursor-pointer disabled:opacity-50"
+                >
+                  {profileSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: ĐỔI MẬT KHẨU */}
+      {isChangingPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl animate-fade-in">
+            <h3 className="text-lg font-bold text-[#111827] mb-4">Đổi mật khẩu</h3>
+
+            {passwordError && (
+              <div className="mb-4 p-2.5 bg-red-50 text-red-600 text-xs rounded-lg border border-red-200">
+                ⚠️ {passwordError}
+              </div>
+            )}
+
+            {passwordSuccess && (
+              <div className="mb-4 p-2.5 bg-emerald-50 text-emerald-700 text-xs rounded-lg border border-emerald-200">
+                ✓ {passwordSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <Input
+                label="Mật khẩu hiện tại *"
+                id="current-password"
+                type="password"
+                required
+                maxLength={32}
+                placeholder="••••••••"
+                value={passwordForm.currentPassword}
+                onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
+              />
+
+              <Input
+                label="Mật khẩu mới *"
+                id="new-password"
+                type="password"
+                required
+                maxLength={32}
+                placeholder="Ít nhất 6 ký tự"
+                value={passwordForm.newPassword}
+                onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
+              />
+
+              <Input
+                label="Xác nhận mật khẩu mới *"
+                id="confirm-password"
+                type="password"
+                required
+                maxLength={32}
+                placeholder="Nhập lại mật khẩu mới"
+                value={passwordForm.confirmPassword}
+                onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
+              />
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsChangingPassword(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50 cursor-pointer"
+                >
+                  Huỷ
+                </button>
+                <button
+                  type="submit"
+                  disabled={passwordSaving}
+                  className="px-4 py-2 bg-[#2563EB] text-white rounded-xl text-sm font-medium hover:bg-blue-700 cursor-pointer disabled:opacity-50"
+                >
+                  {passwordSaving ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

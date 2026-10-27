@@ -7,10 +7,12 @@ require('dotenv').config();
 
 const app = require('./app');
 const { testConnection } = require('./config/db');
+const { startExpireOrdersJob } = require('./jobs/expireOrders');
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, async () => {
   console.log(`[Server] LastBite API chạy tại http://localhost:${PORT}/api/health`);
   await testConnection();
+  startExpireOrdersJob(); // mỗi phút: đơn quá giờ nhận -> "không đến"
 });

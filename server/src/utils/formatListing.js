@@ -1,6 +1,7 @@
 // Chuẩn hoá 1 dòng dữ liệu (kết quả JOIN listings + stores + categories)
 // thành đối tượng Listing đúng như docs/api.md mục 3.5.
 const { toIsoVN } = require('./formatUser');
+const { bookingOpensAt } = require('./timeRules');
 
 // DECIMAL trong MySQL được mysql2 trả về dạng chuỗi ("10.768000") -> đổi sang số.
 function toNumberOrNull(value) {
@@ -11,6 +12,7 @@ function formatListing(row) {
   const originalPrice = Number(row.original_price);
   const salePrice = Number(row.sale_price);
   const remaining = Number(row.remaining);
+  const opensAt = bookingOpensAt(row.pickup_start);
 
   return {
     id: row.id,
@@ -36,6 +38,9 @@ function formatListing(row) {
     pickup_end: toIsoVN(row.pickup_end),
     status: row.status,
     is_available: remaining > 0 && new Date(row.pickup_end).getTime() > Date.now(),
+    // Người mua chỉ đặt được từ mốc này (giờ bắt đầu nhận trừ BOOKING_LEAD_MINUTES).
+    booking_opens_at: toIsoVN(opensAt),
+    is_booking_open: Date.now() >= opensAt.getTime(),
     created_at: toIsoVN(row.created_at),
   };
 }

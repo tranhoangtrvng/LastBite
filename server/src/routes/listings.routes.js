@@ -13,6 +13,7 @@ const { formatListing } = require('../utils/formatListing');
 const { authenticate, authorize } = require('../middlewares/auth');
 const requireApprovedStore = require('../middlewares/requireApprovedStore');
 const { getListings, getListingById, SELECT_LISTING } = require('../controllers/listings.controller');
+const { isToday } = require('../utils/timeRules');
 
 // Quyền cho 3 API ghi dữ liệu: đăng nhập -> vai trò store -> cửa hàng đã duyệt.
 const storeOnly = [authenticate, authorize('store'), requireApprovedStore];
@@ -123,6 +124,16 @@ function validateListingBody(body, current = null) {
   }
   if (pickupStart && pickupEnd && pickupEnd <= pickupStart) {
     fail('pickup_end', 'Giờ kết thúc nhận phải sau giờ bắt đầu');
+  }
+  // Chỉ đăng suất dư CUỐI NGÀY: cả giờ bắt đầu và giờ kết thúc phải nằm trong ngày hôm nay.
+  // (Khi sửa tin mà không đụng đến giờ nhận thì không kiểm tra, tin cũ vẫn sửa giá, số suất... được.)
+  if (check('pickup_start') || check('pickup_end')) {
+    if (pickupStart && !isToday(pickupStart)) {
+      fail('pickup_start', 'Chỉ được đăng suất nhận hàng trong ngày hôm nay (giờ bắt đầu phải là hôm nay)');
+    }
+    if (pickupEnd && !isToday(pickupEnd)) {
+      fail('pickup_end', 'Chỉ được đăng suất nhận hàng trong ngày hôm nay (giờ kết thúc phải trước 24:00 hôm nay)');
+    }
   }
 
   if (errors.length > 0) {

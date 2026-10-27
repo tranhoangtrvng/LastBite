@@ -39,6 +39,8 @@ mysql -u root -p lastbite -e "source database/seed.sql"
 `schema.sql` chạy lại nhiều lần vẫn an toàn. `seed.sql` **xoá sạch dữ liệu rồi nạp lại**, chỉ dùng khi dev hoặc demo.
 Khung giờ nhận của tin mẫu là 20:00 - 21:30 trong ngày chạy seed, nên **hãy chạy lại seed ngay trước buổi demo** để các tin còn hạn.
 
+> **Quy tắc giờ "cuối ngày":** cửa hàng chỉ đăng suất nhận hàng trong ngày hôm nay, và người mua chỉ thấy / đặt được suất trong khoảng `BOOKING_LEAD_MINUTES` phút trước giờ bắt đầu nhận (mặc định 120 phút = 2 tiếng). Vì tin mẫu bắt đầu nhận từ 19:00 - 20:30, nếu demo **ban ngày** mà không thấy món nào thì mở `server/.env`, thêm dòng `BOOKING_LEAD_MINUTES=1440`, rồi chạy lại backend. Đơn quá giờ nhận được server tự chuyển sang "Không đến" mỗi phút.
+
 ### Bước 2. Chạy backend (cổng 5000)
 
 ```powershell
@@ -82,12 +84,12 @@ LastBite/
 ├── client/                  Giao diện (React + Vite)
 │   └── src/
 │       ├── api/             Gọi backend (axiosClient, authApi, listingApi, orderApi, storeApi, categoryApi)
-│       ├── components/      common/ (dùng chung) và store/ (form + danh sách tin của cửa hàng)
+│       ├── components/      common/ (dùng chung, gồm Toast thông báo) và store/ (form + danh sách tin của cửa hàng)
 │       ├── context/         AuthContext (đăng nhập, lưu token)
 │       ├── layouts/         BuyerLayout, StoreLayout
 │       ├── pages/           auth/, buyer/, store/
 │       ├── routes/          ProtectedRoute (chặn trang theo đăng nhập và vai trò)
-│       └── utils/           format.js (tiền, ngày giờ, ảnh), mappers.js (đổi dữ liệu API sang dữ liệu giao diện)
+│       └── utils/           format.js (tiền, ngày giờ, đếm ngược), mappers.js (đổi dữ liệu API sang dữ liệu giao diện), useNow / useRefreshOnFocus (đồng hồ chạy, tự tải lại)
 ├── server/                  Backend (Express)
 │   ├── seed-images/         Ảnh của dữ liệu mẫu (có trong Git)
 │   ├── uploads/             Ảnh người dùng tải lên (không đưa lên Git)
@@ -96,7 +98,8 @@ LastBite/
 │       ├── controllers/     Xử lý nghiệp vụ
 │       ├── middlewares/     Xác thực, phân quyền, upload, xử lý lỗi
 │       ├── routes/          Định nghĩa đường dẫn API
-│       └── utils/           Hàm dùng chung (định dạng dữ liệu, mã nhận hàng, phân trang)
+│       ├── jobs/            Tác vụ nền (mỗi phút đổi đơn quá giờ nhận sang "không đến")
+│       └── utils/           Hàm dùng chung (định dạng dữ liệu, mã nhận hàng, phân trang, quy tắc giờ timeRules.js)
 ├── database/
 │   ├── schema.sql           Tạo database và các bảng
 │   └── seed.sql             Dữ liệu mẫu để demo và test

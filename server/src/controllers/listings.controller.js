@@ -4,6 +4,7 @@ const pool = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
 const { formatListing } = require('../utils/formatListing');
+const { getBookingLeadMinutes } = require('../utils/timeRules');
 
 // Phần SELECT + JOIN dùng chung cho cả danh sách và chi tiết.
 const SELECT_LISTING = `
@@ -19,10 +20,13 @@ const SELECT_LISTING = `
   LEFT JOIN categories c ON c.id = l.category_id`;
 
 // Điều kiện mặc định của danh sách công khai (docs/api.md mục 3.5).
+// Dòng thứ 4 có 1 dấu ? = số phút cho phép đặt trước giờ nhận (BOOKING_LEAD_MINUTES): tin chỉ hiện
+// cho người mua từ (giờ bắt đầu nhận - số phút đó) đến hết giờ nhận. Giá trị được thêm ĐẦU TIÊN vào params.
 const BASE_WHERE = [
   "l.status = 'active'",
   "s.status = 'approved'",
   'l.pickup_end > NOW()',
+  'DATE_SUB(l.pickup_start, INTERVAL ? MINUTE) <= NOW()',
   'l.remaining > 0',
 ];
 
@@ -68,7 +72,7 @@ const getListings = asyncHandler(async (req, res) => {
   const pickupTo = optionalDate(req.query.pickup_to, 'pickup_to');
 
   const where = [...BASE_WHERE];
-  const params = [];
+  const params = [getBookingLeadMinutes()]; // khớp với dấu ? trong BASE_WHERE
 
   if (typeof q === 'string' && q.trim()) {
     // Thoát ký tự đặc biệt của LIKE để "50%" được hiểu là chữ, không phải ký tự đại diện.
