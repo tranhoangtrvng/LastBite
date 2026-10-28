@@ -1,8 +1,9 @@
 import React from 'react';
 
-export default function Badge({ type = 'stock', status, text, className = '' }) {
+export default function Badge({ type = 'stock', status, count: propCount, text, className = '' }) {
   if (type === 'stock') {
-    const count = Number(status) || 0;
+    // Đọc count từ propCount (nếu FoodCard truyền count) hoặc từ status
+    const count = Number(propCount !== undefined ? propCount : status) || 0;
     return (
       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
         count <= 2 

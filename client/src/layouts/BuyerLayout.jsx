@@ -13,8 +13,7 @@ export default function BuyerLayout() {
     navigate('/auth');
   };
 
-  // Khách chưa đăng nhập và người mua thấy menu người mua; cửa hàng có thêm lối về khu quản lý của mình
-  // và admin có lối về trang quản trị.
+  // Khách chưa đăng nhập và người mua thấy menu người mua; cửa hàng có lối về /store; admin có lối về /admin
   const navLinks = [
     { name: 'Trang chủ', path: '/foods' },
     ...(!user || user.role === 'buyer' ? [{ name: 'Đơn hàng của tôi', path: '/orders' }] : []),
@@ -54,7 +53,7 @@ export default function BuyerLayout() {
             })}
           </nav>
 
-          {/* Cụm User & Đăng xuất (khách chưa đăng nhập thì hiện nút Đăng nhập) */}
+          {/* Cụm User & Đăng xuất */}
           <div className="flex items-center gap-3 shrink-0 z-10">
             {isAuthenticated ? (
               <>
@@ -98,4 +97,4 @@ export default function BuyerLayout() {
       </footer>
     </div>
   );
-}
+}
