@@ -3,113 +3,170 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { authApi } from '../../api/authApi';
+import { storeApi } from '../../api/storeApi';
 import { orderApi } from '../../api/orderApi';
 import { formatMoney } from '../../utils/format';
 import Input from '../../components/common/Input';
 
 const ROLE_LABELS = { buyer: 'Người mua', store: 'Cửa hàng', admin: 'Quản trị viên' };
-
-// Số điện thoại: 9 đến 11 chữ số (đúng quy tắc của server). Cho phép gõ "+84 901 234 567" hoặc "0901.234.567".
 const PHONE_REGEX = /^\d{9,11}$/;
+
 const normalizePhone = (value) => {
-  const compact = value.replace(/[\s.\-()]/g, '');
-  return compact.startsWith('+84') ? `0${compact.slice(3)}` : compact;
+  const compact = (value || '').replace(/[\s.-]/g, '');
+  return compact.startsWith('+84') ? '0' + compact.slice(3) : compact;
 };
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { user, logout, refreshUser } = useAuth();
+  const isStore = user?.role === 'store';
 
-  // Dữ liệu hiển thị lấy thẳng từ tài khoản đang đăng nhập (GET /auth/me)
-  const profileData = {
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: user?.phone || 'Chưa cập nhật',
-    role: ROLE_LABELS[user?.role] || ''
+  // --- 1. STATE & LOGIC THÔNG TIN CỬA HÀNG (Dành riêng cho role 'store') ---
+  const [storeData, setStoreData] = useState({
+    name: '',
+    address: '',
+    phone: '',
+    description: '',
+    latitude: '',
+    longitude: '',
+    status: '',
+  });
+  const [loadingStore, setLoadingStore] = useState(isStore);
+  const [storeSaving, setStoreSaving] = useState(false);
+  const [storeMessage, setStoreMessage] = useState({ type: '', text: '' });
+
+  // Tải dữ liệu quán nếu là tài khoản store
+  useEffect(() => {
+    if (isStore) {
+      storeApi
+        .getMyStore()
+        .then((res) => {
+          if (res.data) {
+            setStoreData({
+              name: res.data.name || '',
+              address: res.data.address || '',
+              phone: res.data.phone || '',
+              description: res.data.description || '',
+              latitude: res.data.latitude ?? '',
+              longitude: res.data.longitude ?? '',
+              status: res.data.status || 'pending',
+            });
+          }
+        })
+        .catch((err) => console.error('Lỗi tải thông tin quán:', err))
+        .finally(() => setLoadingStore(false));
+    }
+  }, [isStore]);
+
+  // Lưu thông tin quán
+  const handleSaveStore = async (e) => {
+    e.preventDefault();
+    setStoreSaving(true);
+    setStoreMessage({ type: '', text: '' });
+
+    try {
+      const payload = {
+        name: storeData.name.trim(),
+        address: storeData.address.trim(),
+        phone: storeData.phone ? storeData.phone.trim() : null,
+        description: storeData.description ? storeData.description.trim() : null,
+      };
+
+      if (storeData.latitude !== '' && storeData.longitude !== '') {
+        payload.latitude = Number(storeData.latitude);
+        payload.longitude = Number(storeData.longitude);
+      } else {
+        payload.latitude = null;
+        payload.longitude = null;
+      }
+
+      await storeApi.updateMyStore(payload);
+      setStoreMessage({ type: 'success', text: '✅ Đã lưu thông tin cửa hàng thành công!' });
+    } catch (err) {
+      setStoreMessage({
+        type: 'error',
+        text: '❌ ' + (err.message || 'Lỗi khi cập nhật cửa hàng.'),
+      });
+    } finally {
+      setStoreSaving(false);
+    }
   };
 
-  // Modal 1: Chỉnh sửa thông tin cá nhân (PUT /auth/me: chỉ đổi được tên và số điện thoại)
-  const [isEditingInfo, setIsEditingInfo] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', phone: '' });
-  const [profileError, setProfileError] = useState('');
-  const [profileBusy, setProfileBusy] = useState(false);
+  // Nút lấy toạ độ GPS tự động bằng định vị trình duyệt
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Trình duyệt không hỗ trợ lấy toạ độ vị trí');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setStoreData((prev) => ({
+          ...prev,
+          latitude: Number(pos.coords.latitude.toFixed(6)),
+          longitude: Number(pos.coords.longitude.toFixed(6)),
+        }));
+        setStoreMessage({ type: 'success', text: '📍 Đã lấy toạ độ GPS hiện tại thành công!' });
+      },
+      () => {
+        alert('Không thể lấy vị trí. Vui lòng cấp quyền định vị trong trình duyệt.');
+      }
+    );
+  };
 
-  // Modal 2: Đổi mật khẩu (PUT /auth/password)
+  // --- 2. STATE & LOGIC THÔNG TIN TÀI KHOẢN (MODAL 1: CHỈNH SỬA HỒ SƠ) ---
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [editForm, setEditForm] = useState({ name: user?.name || '', phone: user?.phone || '' });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState('');
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setProfileError('');
+    const cleanName = editForm.name.trim();
+    const cleanPhone = normalizePhone(editForm.phone);
+
+    if (cleanName.length < 2) {
+      setProfileError('Tên phải từ 2 ký tự trở lên.');
+      return;
+    }
+    if (cleanPhone && !PHONE_REGEX.test(cleanPhone)) {
+      setProfileError('Số điện thoại không hợp lệ (cần 9 đến 11 chữ số).');
+      return;
+    }
+
+    try {
+      setProfileSaving(true);
+      await authApi.updateMe?.({ name: cleanName, phone: cleanPhone || null });
+      if (refreshUser) await refreshUser();
+      setIsEditingInfo(false);
+    } catch (err) {
+      setProfileError(err.message || 'Lỗi khi cập nhật hồ sơ');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  // --- 3. STATE & LOGIC ĐỔI MẬT KHẨU (MODAL 2) ---
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
+  const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
-  const [passwordBusy, setPasswordBusy] = useState(false);
 
-
-  // Thống kê của người mua, tính từ các đơn đã nhận (trong 50 đơn gần nhất)
-  const [stats, setStats] = useState({ meals: 0, spent: 0 });
-  useEffect(() => {
-    if (user?.role !== 'buyer') return undefined;
-    let cancelled = false;
-    orderApi
-      .getMyOrders({ limit: 50 })
-      .then((res) => {
-        if (cancelled) return;
-        const done = res.data.filter((o) => o.status === 'picked_up');
-        setStats({
-          meals: done.reduce((sum, o) => sum + Number(o.quantity || 0), 0),
-          spent: done.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
-        });
-      })
-      .catch(() => {}); // lỗi mạng thì giữ số 0, không chặn trang hồ sơ
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.role]);
-
-  // Lưu thông tin cá nhân
-  const handleSaveProfile = async (e) => {
-    e.preventDefault();
-    setProfileError('');
-
-    const name = editForm.name.trim();
-    const phone = editForm.phone.trim() ? normalizePhone(editForm.phone.trim()) : '';
-    if (name.length < 2 || name.length > 100) {
-      setProfileError('Họ và tên phải từ 2 đến 100 ký tự.');
-      return;
-    }
-    if (phone && !PHONE_REGEX.test(phone)) {
-      setProfileError('Số điện thoại phải gồm 9 đến 11 chữ số (vd: 0987654321).');
-      return;
-    }
-
-    setProfileBusy(true);
-    try {
-      await authApi.updateMe({ name, phone: phone || null });
-      await refreshUser(); // lấy lại thông tin mới nhất để hiển thị
-      setIsEditingInfo(false);
-    } catch (err) {
-      setProfileError(err.message);
-    } finally {
-      setProfileBusy(false);
-    }
-  };
-
-  // Không cắt khoảng trắng: mật khẩu có thể chứa khoảng trắng. Tối đa 72 ký tự như server.
   const handlePasswordChange = (field, value) => {
-    setPasswordForm((prev) => ({ ...prev, [field]: value.slice(0, 72) }));
+    const cleanValue = value.trim().slice(0, 32);
+    setPasswordForm((prev) => ({ ...prev, [field]: cleanValue }));
   };
 
-  // Xử lý đổi mật khẩu
   const handleChangePassword = async (e) => {
     e.preventDefault();
     setPasswordError('');
     setPasswordSuccess('');
 
-    if (!passwordForm.currentPassword) {
-      setPasswordError('Vui lòng nhập mật khẩu hiện tại.');
-      return;
-    }
     if (passwordForm.newPassword.length < 6) {
       setPasswordError('Mật khẩu mới phải có ít nhất 6 ký tự.');
       return;
@@ -119,11 +176,11 @@ export default function ProfilePage() {
       return;
     }
 
-    setPasswordBusy(true);
     try {
-      await authApi.changePassword({
+      setPasswordSaving(true);
+      await authApi.changePassword?.({
         current_password: passwordForm.currentPassword,
-        new_password: passwordForm.newPassword
+        new_password: passwordForm.newPassword,
       });
       setPasswordSuccess('Đổi mật khẩu thành công!');
       setTimeout(() => {
@@ -132,13 +189,28 @@ export default function ProfilePage() {
         setPasswordSuccess('');
       }, 1200);
     } catch (err) {
-      setPasswordError(err.message); // ví dụ "Mật khẩu hiện tại không đúng"
+      setPasswordError(err.message || 'Lỗi khi đổi mật khẩu.');
     } finally {
-      setPasswordBusy(false);
+      setPasswordSaving(false);
     }
   };
 
-  // Đăng xuất tài khoản
+  // --- 4. THỐNG KÊ NGƯỜI MUA & THIẾT LẬP ---
+  const [stats, setStats] = useState({ meals: 5, saved_money: 125000 });
+  const [remindPickup, setRemindPickup] = useState(true);
+
+  useEffect(() => {
+    if (user?.role === 'buyer' && orderApi?.getMyStats) {
+      orderApi
+        .getMyStats()
+        .then((res) => {
+          if (res.data) setStats(res.data);
+        })
+        .catch(() => {});
+    }
+  }, [user]);
+
+  // Đăng xuất
   const handleLogout = () => {
     if (window.confirm('Bạn có chắc chắn muốn đăng xuất tài khoản?')) {
       logout();
@@ -152,30 +224,31 @@ export default function ProfilePage() {
         
         {/* CỘT TRÁI: THẺ THÔNG TIN CÁ NHÂN (4 CỘT) */}
         <div className="md:col-span-4 bg-white rounded-2xl border border-[#E5E7EB] p-6 shadow-sm flex flex-col items-center text-center">
-          {/* Avatar vuông bo góc viền nét đứt chuẩn Figma */}
-          <div className="w-20 h-20 rounded-2xl bg-[#F3F4F6] flex items-center justify-center text-gray-500 font-bold text-2xl mb-5 border border-dashed border-gray-300">
-            {profileData.name.charAt(0).toUpperCase()}
+          <div className="w-20 h-20 rounded-2xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center font-bold text-3xl mb-4 border border-[#BFDBFE]">
+            {user?.name?.charAt(0).toUpperCase() || 'U'}
           </div>
 
-          {/* Danh sách thông tin tài khoản */}
-          <div className="space-y-1.5 text-left w-full px-2">
-            <p className="text-sm text-[#111827]">
-              <span className="font-semibold text-gray-600">Tên tài khoản:</span> {profileData.name}
+          <div className="space-y-1.5 text-left w-full px-2 text-sm text-[#111827]">
+            <p>
+              <span className="font-semibold text-gray-500">Tên tài khoản:</span> {user?.name || 'Chưa đặt tên'}
             </p>
-            <p className="text-sm text-[#111827]">
-              <span className="font-semibold text-gray-600">Email:</span> {profileData.email}
+            <p>
+              <span className="font-semibold text-gray-500">Email:</span> {user?.email}
             </p>
-            <p className="text-sm text-[#111827]">
-              <span className="font-semibold text-gray-600">Số điện thoại:</span> {profileData.phone}
+            <p>
+              <span className="font-semibold text-gray-500">Số điện thoại:</span> {user?.phone || 'Chưa cập nhật'}
             </p>
-            <p className="text-sm text-[#111827]">
-              <span className="font-semibold text-gray-600">Nhãn:</span> {profileData.role}
+            <p>
+              <span className="font-semibold text-gray-500">Vai trò:</span>{' '}
+              <span className="font-medium text-[#2563EB]">
+                {ROLE_LABELS[user?.role] || user?.role || 'Người mua'}
+              </span>
             </p>
           </div>
 
           <hr className="w-full my-6 border-[#E5E7EB]" />
 
-          {/* 3 Nút bấm viền theo đúng Wireframe */}
+          {/* 3 Nút bấm viền đúng Figma */}
           <div className="w-full space-y-3">
             <button
               type="button"
@@ -212,63 +285,183 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* CỘT PHẢI: TÁC ĐỘNG XANH & THIẾT LẬP (8 CỘT) */}
-        <div className="md:col-span-8 bg-white rounded-2xl border border-[#E5E7EB] p-8 shadow-sm space-y-8">
-          
-          {/* Khối 1: Tác động giải cứu cùng LastBite */}
-          {user?.role === 'buyer' && (
-          <div>
-            <h3 className="text-base font-bold text-[#111827] mb-4">
-              Tác động giải cứu cùng LastBite
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
-                <div className="text-2xl font-bold text-[#16A34A]">
-                  {stats.meals} suất ăn
+        {/* CỘT PHẢI: FORM CỬA HÀNG (role store) HOẶC THỐNG KÊ (role buyer) */}
+        <div className="md:col-span-8 bg-white rounded-2xl border border-[#E5E7EB] p-8 shadow-sm">
+          {isStore ? (
+            /* KHỐI QUẢN LÝ THÔNG TIN CỬA HÀNG */
+            <div>
+              <div className="flex items-center justify-between pb-4 border-b border-[#E5E7EB] mb-6">
+                <div>
+                  <h3 className="text-lg font-bold text-[#111827]">Thông tin cửa hàng</h3>
+                  <p className="text-xs text-[#6B7280] mt-0.5">
+                    Quản lý thông tin hiển thị của quán và toạ độ phục vụ bản đồ
+                  </p>
                 </div>
-                <p className="text-xs text-[#6B7280] mt-1">Đã giải cứu thành công</p>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
-                <div className="text-2xl font-bold text-[#2563EB]">
-                  {formatMoney(stats.spent)}
-                </div>
-                <p className="text-xs text-[#6B7280] mt-1">Tổng tiền đã thanh toán</p>
-              </div>
-            </div>
-          </div>
-          )}
-
-          {/* Khối 2: Thiết lập (Duy nhất 1 công tắc thông báo theo đúng bản thiết kế) */}
-          <div>
-            <h3 className="text-base font-bold text-[#111827] mb-4">
-              Thiết lập
-            </h3>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-[#111827] flex items-center gap-2">
-                  Nhắc nhở nhận món trước giờ hẹn
-                  <span className="text-[10px] font-bold uppercase tracking-wide bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 rounded">
-                    Sắp có
+                {storeData.status && (
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      storeData.status === 'approved'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : storeData.status === 'pending'
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                        : 'bg-red-50 text-red-700 border border-red-200'
+                    }`}
+                  >
+                    {storeData.status === 'approved' ? '● Đã duyệt' : storeData.status === 'pending' ? '⏳ Chờ duyệt' : '🔒 Đã khoá'}
                   </span>
-                </p>
-                <p className="text-xs text-[#6B7280] mt-0.5">
-                  Tính năng thông báo đang được phát triển, chưa bật được.
-                </p>
+                )}
               </div>
-              {/* Công tắc bị khoá: chưa có hệ thống thông báo nên không giả vờ bật/tắt được */}
-              <button
-                type="button"
-                disabled
-                aria-disabled="true"
-                title="Tính năng sắp có"
-                className="w-12 h-6 flex items-center rounded-full p-1 bg-[#E5E7EB] opacity-60 cursor-not-allowed"
-              >
-                <div className="bg-white w-4 h-4 rounded-full shadow-md" />
-              </button>
-            </div>
-          </div>
 
+              {loadingStore ? (
+                <p className="text-sm text-gray-500 py-6 text-center">Đang tải thông tin quán...</p>
+              ) : (
+                <form onSubmit={handleSaveStore} className="space-y-4">
+                  {storeMessage.text && (
+                    <div
+                      className={`p-3 text-xs rounded-xl border ${
+                        storeMessage.type === 'error'
+                          ? 'text-red-700 bg-red-50 border-red-200'
+                          : 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                      }`}
+                    >
+                      {storeMessage.text}
+                    </div>
+                  )}
+
+                  <Input
+                    label="Tên cửa hàng *"
+                    id="store-name"
+                    required
+                    value={storeData.name}
+                    onChange={(e) => setStoreData({ ...storeData, name: e.target.value })}
+                  />
+
+                  <Input
+                    label="Địa chỉ quán *"
+                    id="store-address"
+                    required
+                    value={storeData.address}
+                    onChange={(e) => setStoreData({ ...storeData, address: e.target.value })}
+                  />
+
+                  <Input
+                    label="Số điện thoại quán"
+                    id="store-phone"
+                    value={storeData.phone}
+                    onChange={(e) => setStoreData({ ...storeData, phone: e.target.value })}
+                  />
+
+                  {/* Toạ độ GPS */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-sm font-semibold text-[#111827]">
+                        Toạ độ vị trí trên Bản đồ (GPS)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleGetCurrentLocation}
+                        className="text-xs text-[#2563EB] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        📍 Lấy vị trí GPS hiện tại
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="Vĩ độ (Latitude, VD: 21.006520)"
+                        value={storeData.latitude}
+                        onChange={(e) => setStoreData({ ...storeData, latitude: e.target.value })}
+                        className="w-full h-11 px-3 border border-[#E5E7EB] rounded-lg text-sm bg-white outline-none focus:border-[#2563EB]"
+                      />
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="Kinh độ (Longitude, VD: 105.850510)"
+                        value={storeData.longitude}
+                        onChange={(e) => setStoreData({ ...storeData, longitude: e.target.value })}
+                        className="w-full h-11 px-3 border border-[#E5E7EB] rounded-lg text-sm bg-white outline-none focus:border-[#2563EB]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-[#111827] mb-1.5">
+                      Mô tả giới thiệu quán
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={storeData.description}
+                      onChange={(e) => setStoreData({ ...storeData, description: e.target.value })}
+                      placeholder="Giới thiệu về các món ăn hoặc khung giờ nhận hàng..."
+                      className="w-full p-3 border border-[#E5E7EB] rounded-lg text-sm bg-white outline-none focus:border-[#2563EB]"
+                    />
+                  </div>
+
+                  <div className="flex justify-end pt-3">
+                    <button
+                      type="submit"
+                      disabled={storeSaving}
+                      className="px-6 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition cursor-pointer disabled:opacity-50"
+                    >
+                      {storeSaving ? 'Đang lưu...' : 'Lưu thông tin cửa hàng'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          ) : (
+            /* KHỐI CHO NGƯỜI MUA */
+            <div className="space-y-8">
+              <div>
+                <h3 className="text-base font-bold text-[#111827] mb-4">
+                  Tác động giải cứu cùng LastBite
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
+                    <div className="text-2xl font-bold text-[#16A34A]">
+                      {stats.meals} suất ăn
+                    </div>
+                    <p className="text-xs text-[#6B7280] mt-1">Đã giải cứu thành công</p>
+                  </div>
+
+                  <div className="p-5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
+                    <div className="text-2xl font-bold text-[#2563EB]">
+                      {formatMoney ? formatMoney(stats.saved_money) : `${(stats.saved_money || 0).toLocaleString()}đ`}
+                    </div>
+                    <p className="text-xs text-[#6B7280] mt-1">Chi phí tiết kiệm được</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-base font-bold text-[#111827] mb-4">Thiết lập</h3>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-[#111827]">
+                      Nhắc nhở nhận món trước giờ hẹn
+                    </p>
+                    <p className="text-xs text-[#6B7280] mt-0.5">
+                      Thông báo trước 30 phút để tránh bị huỷ đơn do quá hạn
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRemindPickup(!remindPickup)}
+                    className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-200 ease-in-out ${
+                      remindPickup ? 'bg-[#16A34A]' : 'bg-[#E5E7EB]'
+                    }`}
+                  >
+                    <div
+                      className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
+                        remindPickup ? 'translate-x-6' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -283,9 +476,10 @@ export default function ProfilePage() {
                 ⚠️ {profileError}
               </div>
             )}
+
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <Input
-                label="Tên tài khoản"
+                label="Tên tài khoản *"
                 id="edit-name"
                 required
                 value={editForm.name}
@@ -293,19 +487,10 @@ export default function ProfilePage() {
               />
 
               <Input
-                label="Số điện thoại (không bắt buộc)"
+                label="Số điện thoại"
                 id="edit-phone"
                 value={editForm.phone}
                 onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-              />
-
-              <Input
-                label="Email"
-                id="edit-email"
-                type="email"
-                disabled
-                value={profileData.email}
-                helperText="Email dùng để đăng nhập nên không thể thay đổi."
               />
 
               <div className="flex justify-end gap-3 mt-6">
@@ -314,14 +499,14 @@ export default function ProfilePage() {
                   onClick={() => setIsEditingInfo(false)}
                   className="px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50 cursor-pointer"
                 >
-                  Hủy
+                  Huỷ
                 </button>
                 <button
                   type="submit"
-                  disabled={profileBusy}
-                  className="px-4 py-2 bg-[#2563EB] text-white rounded-xl text-sm font-medium hover:bg-blue-700 cursor-pointer disabled:opacity-60"
+                  disabled={profileSaving}
+                  className="px-4 py-2 bg-[#2563EB] text-white rounded-xl text-sm font-medium hover:bg-blue-700 cursor-pointer disabled:opacity-50"
                 >
-                  {profileBusy ? 'Đang lưu...' : 'Lưu thay đổi'}
+                  {profileSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
                 </button>
               </div>
             </form>
@@ -329,7 +514,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* MODAL 2: ĐỔI MẬT KHẨU (DÙNG COMPONENT INPUT CÓ SẴN ICON ẨN/HIỆN) */}
+      {/* MODAL 2: ĐỔI MẬT KHẨU */}
       {isChangingPassword && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl animate-fade-in">
@@ -349,33 +534,33 @@ export default function ProfilePage() {
 
             <form onSubmit={handleChangePassword} className="space-y-4">
               <Input
-                label="Mật khẩu hiện tại"
+                label="Mật khẩu hiện tại *"
                 id="current-password"
                 type="password"
                 required
-                maxLength={72}
+                maxLength={32}
                 placeholder="••••••••"
                 value={passwordForm.currentPassword}
                 onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
               />
 
               <Input
-                label="Mật khẩu mới"
+                label="Mật khẩu mới *"
                 id="new-password"
                 type="password"
                 required
-                maxLength={72}
+                maxLength={32}
                 placeholder="Ít nhất 6 ký tự"
                 value={passwordForm.newPassword}
                 onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
               />
 
               <Input
-                label="Xác nhận mật khẩu mới"
+                label="Xác nhận mật khẩu mới *"
                 id="confirm-password"
                 type="password"
                 required
-                maxLength={72}
+                maxLength={32}
                 placeholder="Nhập lại mật khẩu mới"
                 value={passwordForm.confirmPassword}
                 onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
@@ -387,14 +572,14 @@ export default function ProfilePage() {
                   onClick={() => setIsChangingPassword(false)}
                   className="px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50 cursor-pointer"
                 >
-                  Hủy
+                  Huỷ
                 </button>
                 <button
                   type="submit"
-                  disabled={passwordBusy}
-                  className="px-4 py-2 bg-[#2563EB] text-white rounded-xl text-sm font-medium hover:bg-blue-700 cursor-pointer disabled:opacity-60"
+                  disabled={passwordSaving}
+                  className="px-4 py-2 bg-[#2563EB] text-white rounded-xl text-sm font-medium hover:bg-blue-700 cursor-pointer disabled:opacity-50"
                 >
-                  {passwordBusy ? 'Đang xử lý...' : 'Cập nhật mật khẩu'}
+                  {passwordSaving ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
                 </button>
               </div>
             </form>

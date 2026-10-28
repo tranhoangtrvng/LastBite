@@ -281,4 +281,40 @@ router.post('/', storeOnly, asyncHandler(async (req, res) => {
   });
 }));
 
+// ==============================================================
+// 6. GET /api/stores - Danh sách quán đã duyệt cho Bản đồ (Công khai - P1)
+// ==============================================================
+router.get('/', asyncHandler(async (req, res) => {
+  const [rows] = await pool.query(
+    "SELECT * FROM stores WHERE status = 'approved' ORDER BY id ASC"
+  );
+  res.json({
+    success: true,
+    data: rows.map((r) => formatStore(r, { includeOwner: false })),
+  });
+}));
+
+// ==============================================================
+// 7. GET /api/stores/:id - Xem chi tiết 1 quán (Công khai - P1)
+// ==============================================================
+router.get('/:id', asyncHandler(async (req, res) => {
+  const storeId = Number(req.params.id);
+  if (!Number.isInteger(storeId) || storeId <= 0) {
+    throw new AppError('Mã cửa hàng không hợp lệ', 400);
+  }
+
+  const [rows] = await pool.query(
+    "SELECT * FROM stores WHERE id = ? AND status = 'approved'",
+    [storeId]
+  );
+  if (rows.length === 0) {
+    throw new AppError('Không tìm thấy cửa hàng', 404);
+  }
+
+  res.json({
+    success: true,
+    data: formatStore(rows[0], { includeOwner: false }),
+  });
+}));
+
 module.exports = router;
