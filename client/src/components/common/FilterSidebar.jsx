@@ -56,7 +56,7 @@ export default function FilterSidebar({ onApplyFilter, onResetFilter, categoryOp
   };
 
   return (
-    <aside className={`w-[280px] bg-white rounded-xl border border-[#E5E7EB] p-5 shadow-sm space-y-6 text-left shrink-0 ${className}`}>
+    <aside className={`w-full lg:w-[280px] bg-white rounded-xl border border-[#E5E7EB] p-5 shadow-sm space-y-6 text-left shrink-0 ${className}`}>
       {/* Tiêu đề Sidebar */}
       <div className="flex items-center justify-between border-b border-gray-100 pb-3">
         <h3 className="text-base font-bold text-[#111827]">BỘ LỌC TÌM KIẾM</h3>
@@ -138,4 +138,4 @@ export default function FilterSidebar({ onApplyFilter, onResetFilter, categoryOp
       </div>
     </aside>
   );
-}
+}

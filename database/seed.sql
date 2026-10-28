@@ -158,6 +158,9 @@ INSERT INTO notifications (user_id, title, content, is_read) VALUES
   (7, 'Có đơn đặt mới', 'Khách Nguyễn Văn A vừa đặt 1 suất Cơm đùi gà chiên giòn rụm sốt cay.', 0),
   (8, 'Đặt chỗ thành công', 'Mã nhận hàng đã sẵn sàng, hãy đến lấy trong khung giờ quy định.', 0);
 
+
+UPDATE listings SET status = 'hidden' WHERE id BETWEEN 8 AND 16;
+
 -- ---------------------------------------------------------------------
 -- TUỲ CHỌN: muốn test duyệt/khoá cửa hàng và khoá người mua, bỏ comment 3 dòng dưới
 -- (mặc định để nguyên 7 quán đã duyệt cho khớp dữ liệu TV3)
