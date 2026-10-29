@@ -8,6 +8,7 @@ export { default as BookingModal } from './BookingModal';
 export { default as PickupCode } from './PickupCode';
 export { default as PickupSuccessModal } from './PickupSuccessModal';
 export { default as OrderCard } from './OrderCard';
+export { default as ForgotPasswordModal } from './ForgotPasswordModal';
 export { default as SearchBar } from './SearchBar';
 export { default as SortDropdown } from './SortDropdown';
 export { default as FilterSidebar } from './FilterSidebar';

@@ -26,13 +26,13 @@ export default function BookingModal({ isOpen, onClose, item, onConfirm, isSubmi
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Xác nhận đặt giữ chỗ" maxWidth="max-w-[500px]">
       <div className="space-y-4 text-left">
-        {/* Tên món & Tên quán[cite: 13] */}
+        {/* Tên món & Tên quán */}
         <div className="border-b border-[#E5E7EB] pb-3">
           <h4 className="font-bold text-base text-[#111827]">{item.title}</h4>
           <p className="text-xs text-[#6B7280] mt-0.5">{item.storeName}</p>
         </div>
 
-        {/* Bộ đếm số lượng suất[cite: 13] */}
+        {/* Bộ đếm số lượng suất */}
         <div>
           <label className="text-xs font-semibold text-[#111827] block mb-2">
             Số lượng muốn đặt:
@@ -65,7 +65,7 @@ export default function BookingModal({ isOpen, onClose, item, onConfirm, isSubmi
           </div>
         </div>
 
-        {/* Tóm tắt tiền[cite: 13] */}
+        {/* Tóm tắt tiền */}
         <div className="space-y-1 text-xs text-[#4B5563] pt-1">
           <p>Đơn giá: <span className="font-semibold">{item.discountPrice.toLocaleString('vi-VN')}đ</span></p>
           <p className="text-sm font-bold text-[#111827]">
@@ -73,10 +73,10 @@ export default function BookingModal({ isOpen, onClose, item, onConfirm, isSubmi
           </p>
         </div>
 
-        {/* Lưu ý nhận món[cite: 13] */}
+        {/* Lưu ý nhận món: Thanh toán tiền mặt tại quầy */}
         <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-900 leading-relaxed">
           ℹ️ Vui lòng đến nhận hàng đúng khung giờ <strong>{item.pickupTimeRange}</strong>
-          {item.pickupToday === false && <> (ngày <strong>{item.pickupDateLabel}</strong>)</>}. Đơn hàng thanh toán bằng tiền mặt trực tiếp tại quầy khi nhận đồ (không thanh toán online).
+          {item.pickupToday === false && <> (ngày <strong>{item.pickupDateLabel}</strong>)</>}. Thanh toán trực tiếp bằng tiền mặt tại quầy khi nhận đồ.
         </div>
 
         {/* Lỗi từ server (hết suất, hết giờ nhận...) */}
@@ -86,7 +86,7 @@ export default function BookingModal({ isOpen, onClose, item, onConfirm, isSubmi
           </div>
         )}
 
-        {/* Cụm 2 nút chân modal[cite: 13] */}
+        {/* Cụm 2 nút chân modal */}
         <div className="flex gap-3 pt-3 border-t border-[#E5E7EB]">
           <Button variant="outline" size="md" className="flex-1" onClick={onClose} disabled={isSubmitting}>
             QUAY LẠI
@@ -104,4 +104,4 @@ export default function BookingModal({ isOpen, onClose, item, onConfirm, isSubmi
       </div>
     </Modal>
   );
-}
+}

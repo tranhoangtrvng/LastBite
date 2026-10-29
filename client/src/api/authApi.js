@@ -14,6 +14,12 @@ export const authApi = {
   // Sửa hồ sơ: chỉ đổi được name và phone (email, role bị server bỏ qua)
   updateMe: (data) => axiosClient.put('/auth/me', data),
 
-  // Đổi mật khẩu: { current_password, new_password }. Sai mật khẩu hiện tại trả 400.
+  // Đổi mật khẩu (khi ĐÃ đăng nhập tại Profile): { current_password, new_password }
   changePassword: (data) => axiosClient.put('/auth/password', data),
+
+  // 1. Quên mật khẩu: gửi { email } để yêu cầu gửi mã xác thực OTP
+  forgotPassword: (data) => axiosClient.post('/auth/forgot-password', data),
+
+  // 2. Đặt lại mật khẩu: gửi { email, otp, newPassword } để lưu mật khẩu mới
+  resetPassword: (data) => axiosClient.post('/auth/reset-password', data),
 };

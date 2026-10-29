@@ -171,6 +171,7 @@ export default function ProfilePage() {
       setPasswordError('Mật khẩu mới phải có ít nhất 6 ký tự.');
       return;
     }
+
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setPasswordError('Mật khẩu xác nhận không khớp.');
       return;
@@ -195,19 +196,22 @@ export default function ProfilePage() {
     }
   };
 
-  // --- 4. THỐNG KÊ NGƯỜI MUA & THIẾT LẬP ---
-  const [stats, setStats] = useState({ meals: 5, saved_money: 125000 });
-  const [remindPickup, setRemindPickup] = useState(true);
+  // --- 4. THỐNG KÊ NGƯỜI MUA ---
+  // Tính từ các đơn ĐÃ NHẬN của chính người mua (GET /orders/my), không dùng số giả.
+  const [stats, setStats] = useState({ meals: 0, saved_money: 0 });
 
   useEffect(() => {
-    if (user?.role === 'buyer' && orderApi?.getMyStats) {
-      orderApi
-        .getMyStats()
-        .then((res) => {
-          if (res.data) setStats(res.data);
-        })
-        .catch(() => {});
-    }
+    if (user?.role !== 'buyer') return;
+    orderApi
+      .getMyOrders({ limit: 50 })
+      .then((res) => {
+        const pickedUp = (res.data || []).filter((o) => o.status === 'picked_up');
+        setStats({
+          meals: pickedUp.reduce((sum, o) => sum + Number(o.quantity || 0), 0),
+          saved_money: pickedUp.reduce((sum, o) => sum + Number(o.total_price || 0), 0),
+        });
+      })
+      .catch(() => {});
   }, [user]);
 
   // Đăng xuất
@@ -427,36 +431,37 @@ export default function ProfilePage() {
 
                   <div className="p-5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
                     <div className="text-2xl font-bold text-[#2563EB]">
-                      {formatMoney ? formatMoney(stats.saved_money) : `${(stats.saved_money || 0).toLocaleString()}đ`}
+                      {formatMoney(stats.saved_money)}
                     </div>
-                    <p className="text-xs text-[#6B7280] mt-1">Chi phí tiết kiệm được</p>
+                    <p className="text-xs text-[#6B7280] mt-1">Tổng tiền các suất đã nhận</p>
                   </div>
                 </div>
               </div>
 
+              {/* Thiết lập: tính năng nhắc nhở chưa làm nên khoá công tắc và ghi "Sắp có" */}
               <div>
                 <h3 className="text-base font-bold text-[#111827] mb-4">Thiết lập</h3>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between opacity-60">
                   <div>
-                    <p className="text-sm font-semibold text-[#111827]">
-                      Nhắc nhở nhận món trước giờ hẹn
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-[#111827]">
+                        Nhắc nhở nhận món trước giờ hẹn
+                      </p>
+                      <span className="rounded bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500 border border-gray-200">
+                        Sắp có
+                      </span>
+                    </div>
                     <p className="text-xs text-[#6B7280] mt-0.5">
-                      Thông báo trước 30 phút để tránh bị huỷ đơn do quá hạn
+                      Tính năng nhận thông báo đẩy qua trình duyệt đang được phát triển
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setRemindPickup(!remindPickup)}
-                    className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-200 ease-in-out ${
-                      remindPickup ? 'bg-[#16A34A]' : 'bg-[#E5E7EB]'
-                    }`}
+                    disabled
+                    title="Tính năng sắp có"
+                    className="w-12 h-6 flex items-center rounded-full p-1 bg-[#E5E7EB] cursor-not-allowed"
                   >
-                    <div
-                      className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
-                        remindPickup ? 'translate-x-6' : 'translate-x-0'
-                      }`}
-                    />
+                    <div className="bg-white w-4 h-4 rounded-full shadow-md" />
                   </button>
                 </div>
               </div>
