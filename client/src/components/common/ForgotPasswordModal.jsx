@@ -6,7 +6,7 @@ import Button from './Button';
 import { authApi } from '../../api/authApi';
 
 export default function ForgotPasswordModal({ isOpen, onClose }) {
-  const [step, setStep] = useState(1); // 1: Nhập email/SĐT, 2: Nhập OTP & Mật khẩu mới
+  const [step, setStep] = useState(1); // 1: Nhập email, 2: Nhập mã 6 số & mật khẩu mới
 
   // Form states
   const [identifier, setIdentifier] = useState('');
@@ -19,8 +19,8 @@ export default function ForgotPasswordModal({ isOpen, onClose }) {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Server tìm tài khoản theo EMAIL (POST /api/auth/forgot-password nhận { email }).
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  const phoneRegex = /^(0|\+84)[0-9]{9}$/;
 
   const handleModalClose = () => {
     setStep(1);
@@ -41,21 +41,17 @@ export default function ForgotPasswordModal({ isOpen, onClose }) {
 
     const cleanInput = identifier.trim();
     if (!cleanInput) {
-      setErrorMessage('Vui lòng nhập Email hoặc Số điện thoại tài khoản.');
+      setErrorMessage('Vui lòng nhập email của tài khoản.');
       return;
     }
-    if (!emailRegex.test(cleanInput) && !phoneRegex.test(cleanInput)) {
-      setErrorMessage('Email hoặc Số điện thoại không đúng định dạng.');
+    if (!emailRegex.test(cleanInput)) {
+      setErrorMessage('Email không đúng định dạng.');
       return;
     }
 
     try {
       setLoading(true);
-      // Gửi cả email và emailOrPhone để backend nhận diện linh hoạt
-      const res = await authApi.forgotPassword({
-        email: cleanInput,
-        emailOrPhone: cleanInput,
-      });
+      const res = await authApi.forgotPassword({ email: cleanInput });
 
       setStep(2);
       setSuccessMessage(res?.message || 'Mã xác thực đã được gửi! Vui lòng kiểm tra hộp thư hoặc tin nhắn.');
@@ -73,8 +69,8 @@ export default function ForgotPasswordModal({ isOpen, onClose }) {
     setSuccessMessage('');
 
     const cleanOtp = otp.trim();
-    if (!cleanOtp) {
-      setErrorMessage('Vui lòng nhập mã xác thực OTP.');
+    if (!/^\d{6}$/.test(cleanOtp)) {
+      setErrorMessage('Mã xác thực gồm 6 chữ số.');
       return;
     }
     if (!newPassword || newPassword.length < 6) {
@@ -88,11 +84,11 @@ export default function ForgotPasswordModal({ isOpen, onClose }) {
 
     try {
       setLoading(true);
+      // Đúng tên trường của server: { email, code, new_password }
       const res = await authApi.resetPassword({
         email: identifier.trim(),
-        emailOrPhone: identifier.trim(),
-        otp: cleanOtp,
-        newPassword,
+        code: cleanOtp,
+        new_password: newPassword,
       });
 
       setSuccessMessage(res?.message || 'Đặt lại mật khẩu thành công! Bạn có thể đăng nhập ngay.');
@@ -134,13 +130,14 @@ export default function ForgotPasswordModal({ isOpen, onClose }) {
         {step === 1 ? (
           <form onSubmit={handleRequestOtp} className="space-y-4">
             <p className="text-xs text-[#6B7280] leading-relaxed">
-              Nhập email hoặc số điện thoại đã đăng ký để nhận mã OTP khôi phục mật khẩu.
+              Nhập email đã đăng ký để nhận mã 6 chữ số khôi phục mật khẩu (hiệu lực 15 phút).
             </p>
 
             <Input
               id="forgot-identifier"
-              label="Email hoặc Số điện thoại"
-              placeholder="Nhập email hoặc SĐT..."
+              label="Email"
+              type="email"
+              placeholder="ten@gmail.com"
               value={identifier}
               onChange={(e) => {
                 setIdentifier(e.target.value);
@@ -174,15 +171,20 @@ export default function ForgotPasswordModal({ isOpen, onClose }) {
           /* Form Giai đoạn 2: Nhập OTP & Đặt mật khẩu mới */
           <form onSubmit={handleResetPassword} className="space-y-3.5">
             <p className="text-xs text-[#6B7280] leading-relaxed">
-              Nhập mã OTP và mật khẩu mới cho tài khoản:
+              Nhập mã 6 chữ số và mật khẩu mới cho tài khoản:
               <span className="font-semibold text-gray-800 ml-1">{identifier}</span>
+            </p>
+            {/* Bản demo chạy local chưa gửi được email thật: mã được in ở cửa sổ backend */}
+            <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+              Bản demo: mã được in ở cửa sổ chạy backend (dòng "[Quên mật khẩu] Mã đặt lại cho ...").
             </p>
 
             <Input
               id="otp-code"
-              label="Mã xác thực (OTP)"
-              placeholder="Nhập mã xác thực..."
-              maxLength={10}
+              label="Mã xác thực (6 chữ số)"
+              placeholder="123456"
+              inputMode="numeric"
+              maxLength={6}
               value={otp}
               onChange={(e) => {
                 setOtp(e.target.value);

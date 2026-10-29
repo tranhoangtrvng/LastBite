@@ -17,9 +17,9 @@ export const authApi = {
   // Đổi mật khẩu (khi ĐÃ đăng nhập tại Profile): { current_password, new_password }
   changePassword: (data) => axiosClient.put('/auth/password', data),
 
-  // 1. Quên mật khẩu: gửi { email } để yêu cầu gửi mã xác thực OTP
+  // 1. Quên mật khẩu: gửi { email } để xin mã 6 số (bản demo in mã ở cửa sổ backend)
   forgotPassword: (data) => axiosClient.post('/auth/forgot-password', data),
 
-  // 2. Đặt lại mật khẩu: gửi { email, otp, newPassword } để lưu mật khẩu mới
+  // 2. Đặt lại mật khẩu: gửi { email, code, new_password } (code = mã 6 số) để lưu mật khẩu mới
   resetPassword: (data) => axiosClient.post('/auth/reset-password', data),
 };

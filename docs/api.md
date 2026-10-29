@@ -166,6 +166,8 @@ Phụ trách: **VT1** Backend Lead, **VT3** module cửa hàng, **VT4** module a
 | 5 | GET | `/auth/me` | Đăng nhập | Thông tin tài khoản hiện tại | P0 | VT1 | 16/10 | [ ] |
 | 6 | PUT | `/auth/me` | Đăng nhập | Sửa hồ sơ | P0 | VT1 | 22/10 | [ ] |
 | 7 | PUT | `/auth/password` | Đăng nhập | Đổi mật khẩu | P0 | VT1 | 22/10 | [ ] |
+| 7a | POST | `/auth/forgot-password` | Công khai | Quên mật khẩu: xin mã 6 số | P1 | VT1 | 28/10 | [x] |
+| 7b | POST | `/auth/reset-password` | Công khai | Dùng mã để đặt mật khẩu mới | P1 | VT1 | 28/10 | [x] |
 | 8 | GET | `/categories` | Công khai | Danh sách loại món | P0 | VT1 | 17/10 | [ ] |
 | 9 | POST | `/uploads/image` | store, admin | Tải ảnh lên | P0 | VT3 | 17/10 | [ ] |
 | 10 | GET | `/listings` | Công khai | Tìm kiếm, lọc suất đồ ăn | P0 | VT1 | 18/10 (bản đầu), 21/10 (đủ lọc) | [ ] |
@@ -194,9 +196,9 @@ Phụ trách: **VT1** Backend Lead, **VT3** module cửa hàng, **VT4** module a
 | 33 | DELETE | `/favorites/:storeId` | buyer | Bỏ yêu thích | P1 | VT4 | 27/10 | [ ] |
 | 34 | POST | `/orders/:id/review` | buyer | Đánh giá đơn đã nhận | P2 | VT4 | nếu kịp | [ ] |
 | 35 | GET | `/stores/:id/reviews` | Công khai | Đánh giá của cửa hàng | P2 | VT4 | nếu kịp | [ ] |
-| 36 | GET | `/notifications` | Đăng nhập | Danh sách thông báo | P2 | VT4 | nếu kịp | [ ] |
-| 37 | PATCH | `/notifications/:id/read` | Đăng nhập | Đánh dấu đã đọc | P2 | VT4 | nếu kịp | [ ] |
-| 38 | PATCH | `/notifications/read-all` | Đăng nhập | Đọc hết | P2 | VT4 | nếu kịp | [ ] |
+| 36 | GET | `/notifications` | Đăng nhập | Danh sách thông báo | P2 | VT1 (thay VT4) | 28/10 | [x] |
+| 37 | PATCH | `/notifications/:id/read` | Đăng nhập | Đánh dấu đã đọc | P2 | VT1 (thay VT4) | 28/10 | [x] |
+| 38 | PATCH | `/notifications/read-all` | Đăng nhập | Đọc hết | P2 | VT1 (thay VT4) | 28/10 | [x] |
 | 39 | GET | `/admin/stores` | admin | Danh sách cửa hàng | P0 | VT4 | 20/10 | [ ] |
 | 40 | PATCH | `/admin/stores/:id/status` | admin | Duyệt hoặc khoá cửa hàng | P0 | VT4 | 20/10 | [ ] |
 | 41 | GET | `/admin/users` | admin | Danh sách người dùng | P0 | VT4 | 23/10 | [ ] |
@@ -359,6 +361,44 @@ Phản hồi **200**: `user` sau khi cập nhật. Lỗi: `400`.
 
 Phản hồi **200**: `{ "success": true, "message": "Đã đổi mật khẩu" }`.
 Lỗi: `400` nếu mật khẩu hiện tại sai hoặc mật khẩu mới không hợp lệ (dùng 400, không dùng 401, xem mục 1.4).
+
+---
+
+#### POST /auth/forgot-password
+
+**Quyền:** Công khai. Xin mã đặt lại mật khẩu khi quên mật khẩu.
+
+```json
+{ "email": "buyer.lastbite@gmail.com" }
+```
+
+Phản hồi **200** luôn cùng một câu, dù email có tồn tại hay không (để không ai dò được email nào đã đăng ký):
+`{ "success": true, "message": "Nếu email này đã đăng ký, mã đặt lại mật khẩu (6 chữ số, hiệu lực 15 phút) đã được gửi tới bạn" }`.
+
+- Mã gồm 6 chữ số, hiệu lực **15 phút**, chỉ dùng 1 lần. Database chỉ lưu bản băm (bảng `password_resets`).
+- Dự án chạy local, chưa có dịch vụ email, nên mã được **in ra cửa sổ backend**: `[Quên mật khẩu] Mã đặt lại cho <email>: 123456 (hết hạn sau 15 phút)`.
+- Xin mã mới thì mã cũ hết hiệu lực. Hai lần xin mã cho cùng một tài khoản phải cách nhau **60 giây** (xin sớm hơn thì không tạo mã mới).
+- Tài khoản bị khoá không nhận được mã.
+
+Lỗi: `400` nếu không gửi email.
+
+#### POST /auth/reset-password
+
+**Quyền:** Công khai. Dùng mã để đặt mật khẩu mới.
+
+```json
+{ "email": "buyer.lastbite@gmail.com", "code": "123456", "new_password": "matkhaumoi456" }
+```
+
+Phản hồi **200**: `{ "success": true, "message": "Đã đặt lại mật khẩu, bạn có thể đăng nhập bằng mật khẩu mới" }`.
+
+| Mã | Khi nào | Thông báo gợi ý |
+|---|---|---|
+| 400 | Mã không phải 6 chữ số, hoặc mật khẩu mới không từ 6 đến 72 ký tự | "Mã gồm 6 chữ số" / "Mật khẩu mới phải từ 6 đến 72 ký tự" |
+| 400 | Mã sai, hết hạn, đã dùng, hoặc email không có | "Mã không đúng hoặc đã hết hạn (còn 4 lần thử)" |
+| 400 | Sai đủ 5 lần, mã bị huỷ | "Nhập sai quá 5 lần, mã đã bị huỷ. Hãy yêu cầu mã mới" |
+
+Lưu ý: token đăng nhập cũ (nếu có) vẫn còn hạn đến khi tự hết hạn.
 
 ---
 
@@ -762,6 +802,9 @@ Lỗi:
 | 409 | Hết giờ nhận | "Suất này đã hết giờ nhận" |
 | 409 | Chưa tới giờ mở đặt | "Suất này chưa mở đặt chỗ, bạn đặt được từ 18:00" |
 | 409 | Không đủ suất | "Không đủ suất, chỉ còn 1 suất" |
+| 409 | Đang có 2 đơn chờ nhận (còn trong giờ nhận) | "Bạn đang có 2 đơn chờ nhận. Mỗi người chỉ giữ tối đa 2 đơn cùng lúc, hãy nhận hoặc huỷ bớt trước khi đặt thêm" |
+
+**Chống giữ chỗ ảo:** mỗi người mua giữ tối đa **2 đơn `pending`** còn trong giờ nhận cùng lúc (đơn đã quá giờ nhận không tính). Khi đặt thành công, server tạo thông báo "Có đơn mới" cho chủ cửa hàng (xem mục 3.12), **không** kèm mã nhận hàng.
 
 #### GET /orders/my
 
@@ -892,7 +935,7 @@ Lỗi: `403` (không phải chủ đơn), `409` "Đơn chưa được nhận" ho
 
 ---
 
-### 3.12 Thông báo (VT4, P2)
+### 3.12 Thông báo (P2, VT1 đã làm ngày 28/10)
 
 | API | Mô tả |
 |---|---|
@@ -916,6 +959,10 @@ Lỗi: `403` (không phải chủ đơn), `409` "Đơn chưa được nhận" ho
   "pagination": { "page": 1, "limit": 12, "total": 2, "total_pages": 1 }
 }
 ```
+
+`PATCH /notifications/:id/read` trả `{ success, data: <thông báo>, unread_count }`; `PATCH /notifications/read-all` trả `{ success, message, updated, unread_count: 0 }`. Thông báo của người khác trả `404`.
+
+**Hiện đã có:** chủ cửa hàng nhận "Có đơn mới" mỗi khi có người đặt chỗ (tạo trong transaction của `POST /orders`). Các loại dưới đây **chưa làm**.
 
 **Thông báo do hệ thống tự tạo** (không có API tạo từ ngoài), ví dụ: cửa hàng nhận thông báo khi có đơn mới hoặc khi khách huỷ; người mua nhận thông báo khi đơn được xác nhận; chủ cửa hàng nhận thông báo khi được duyệt hoặc bị khoá.
 
@@ -1195,3 +1242,4 @@ curl -X POST http://localhost:5000/api/orders \
 |---|---|---|
 | 15/10/2026 | Bản v1 đầu tiên | VT1 |
 | 27/10/2026 | Quy tắc giờ "cuối ngày": đăng tin chỉ trong ngày hôm nay; người mua chỉ đặt trong `BOOKING_LEAD_MINUTES` phút trước giờ nhận (thêm `booking_opens_at`, `is_booking_open`); tự động chuyển đơn quá giờ sang `no_show`; `confirm` bị chặn sau `pickup_end` | VT1 |
+| 28/10/2026 | `POST /orders`: giới hạn 2 đơn chờ, tạo thông báo "Có đơn mới" cho chủ quán; làm 3 API `/notifications`; thêm `POST /auth/forgot-password`, `POST /auth/reset-password` (bảng `password_resets`) | VT1 |

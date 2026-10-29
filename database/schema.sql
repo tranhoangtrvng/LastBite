@@ -184,6 +184,22 @@ CREATE TABLE IF NOT EXISTS notifications (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
+-- 9. password_resets : mã đặt lại mật khẩu khi QUÊN mật khẩu
+--    POST /auth/forgot-password tạo mã, POST /auth/reset-password dùng mã.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS password_resets (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id    INT UNSIGNED NOT NULL,
+  code_hash  VARCHAR(255) NOT NULL,                 -- băm bcrypt của mã 6 số, KHÔNG lưu mã thô
+  expires_at DATETIME NOT NULL,                     -- hết hạn sau 15 phút
+  attempts   TINYINT UNSIGNED NOT NULL DEFAULT 0,   -- số lần nhập sai (tối đa 5)
+  used_at    DATETIME NULL,                         -- đã dùng hoặc đã bị thay bằng mã mới
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_password_resets_user (user_id, used_at, expires_at),
+  CONSTRAINT fk_password_resets_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
 -- Dữ liệu tham chiếu: các loại món (cần có sẵn cho bộ lọc và form đăng tin)
 -- Chạy lại nhiều lần không bị trùng nhờ INSERT IGNORE.
 -- Dữ liệu mẫu khác (tài khoản, cửa hàng, tin đăng) nằm trong database/seed.sql

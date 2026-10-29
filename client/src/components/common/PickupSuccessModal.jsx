@@ -13,9 +13,9 @@ export default function PickupSuccessModal({
 }) {
   if (!bookingData) return null;
 
-  const expireTime = bookingData.pickupTimeRange 
-    ? bookingData.pickupTimeRange.split('-')[1]?.trim() 
-    : '21:30';
+  const expireTime = bookingData.pickupTimeRange
+    ? bookingData.pickupTimeRange.split('-')[1]?.trim() || ''
+    : '';
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[480px]">
@@ -35,7 +35,7 @@ export default function PickupSuccessModal({
 
         {/* Nhúng Component PickupCode tại đây */}
         <PickupCode 
-          code={bookingData.pickupCode || 'LB-9482'} 
+          code={bookingData.pickupCode || ''}
           expireTime={expireTime}
           pickupToday={bookingData.pickupToday}
           pickupDateLabel={bookingData.pickupDateLabel}
@@ -44,8 +44,8 @@ export default function PickupSuccessModal({
         {/* Danh sách tóm tắt thông tin nhận món */}
         <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg p-3 text-left text-xs text-[#374151] space-y-1.5">
           <p>• Suất ăn: <strong>{bookingData.title} × {bookingData.selectedQuantity || 1}</strong></p>
-          <p>• Địa chỉ: {bookingData.storeAddress || '123 Chùa Láng, Đống Đa, Hà Nội'}</p>
-          <p>• Thanh toán tiền mặt tại quầy: <strong className="text-[#2563EB]">{(bookingData.totalPrice || 20000).toLocaleString('vi-VN')}đ</strong></p>
+          <p>• Địa chỉ: {bookingData.storeAddress}</p>
+          <p>• Thanh toán tiền mặt tại quầy: <strong className="text-[#2563EB]">{Number(bookingData.totalPrice || 0).toLocaleString('vi-VN')}đ</strong></p>
         </div>
 
         {/* Cảnh báo nhận đơn */}

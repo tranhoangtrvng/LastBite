@@ -36,8 +36,16 @@ mysql -u root -p -e "source database/schema.sql"
 mysql -u root -p lastbite -e "source database/seed.sql"
 ```
 
+Muốn các tin mẫu có ảnh riêng, chạy thêm (sau `seed.sql`): `mysql -u root -p lastbite -e "source database/seed_images.sql"`.
+
 `schema.sql` chạy lại nhiều lần vẫn an toàn. `seed.sql` **xoá sạch dữ liệu rồi nạp lại**, chỉ dùng khi dev hoặc demo.
 Khung giờ nhận của tin mẫu là 20:00 - 21:30 trong ngày chạy seed, nên **hãy chạy lại seed ngay trước buổi demo** để các tin còn hạn.
+
+> **Ngày 28/10 có thêm bảng `password_resets`:** máy nào đã có database cũ thì chạy lại `schema.sql` một lần (an toàn, không xoá dữ liệu): `mysql -u root -p -e "source database/schema.sql"`. File `seed.sql` cũng tự tạo bảng này nếu thiếu.
+>
+> **Quên mật khẩu:** gọi `POST /api/auth/forgot-password`, mã 6 số hiện ở **cửa sổ backend** (dự án chưa gửi email thật), rồi dùng `POST /api/auth/reset-password`.
+>
+> **Giới hạn 2 đơn chờ:** mỗi người mua giữ tối đa 2 đơn "chờ nhận" cùng lúc. Sau khi chạy seed, `buyer.lastbite@gmail.com` có 1 đơn chờ (đặt thêm được 1), còn `ha.lastbite@gmail.com` có sẵn 5 đơn chờ nên sẽ bị chặn, dùng để demo luật này.
 
 > **Quy tắc giờ "cuối ngày":** cửa hàng chỉ đăng suất nhận hàng trong ngày hôm nay, và người mua chỉ thấy / đặt được suất trong khoảng `BOOKING_LEAD_MINUTES` phút trước giờ bắt đầu nhận (mặc định 120 phút = 2 tiếng). Vì tin mẫu bắt đầu nhận từ 19:00 - 20:30, nếu demo **ban ngày** mà không thấy món nào thì mở `server/.env`, thêm dòng `BOOKING_LEAD_MINUTES=1440`, rồi chạy lại backend. Đơn quá giờ nhận được server tự chuyển sang "Không đến" mỗi phút.
 

@@ -37,7 +37,22 @@
 USE lastbite;
 
 SET NAMES utf8mb4;
+-- Bảng mã quên mật khẩu (thêm ngày 28/10). Tạo ở đây nữa để máy chưa chạy lại schema.sql vẫn nạp seed được;
+-- định nghĩa phải GIỐNG HỆT trong schema.sql.
+CREATE TABLE IF NOT EXISTS password_resets (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id    INT UNSIGNED NOT NULL,
+  code_hash  VARCHAR(255) NOT NULL,                 -- băm bcrypt của mã 6 số, KHÔNG lưu mã thô
+  expires_at DATETIME NOT NULL,                     -- hết hạn sau 15 phút
+  attempts   TINYINT UNSIGNED NOT NULL DEFAULT 0,   -- số lần nhập sai (tối đa 5)
+  used_at    DATETIME NULL,                         -- đã dùng hoặc đã bị thay bằng mã mới
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_password_resets_user (user_id, used_at, expires_at),
+  CONSTRAINT fk_password_resets_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 SET FOREIGN_KEY_CHECKS = 0;
+TRUNCATE TABLE password_resets;
 TRUNCATE TABLE notifications;
 TRUNCATE TABLE reviews;
 TRUNCATE TABLE favorites;
@@ -123,13 +138,13 @@ INSERT INTO orders (id, buyer_id, listing_id, quantity, unit_price, total_price,
   (2, 8, 1, 1, 20000, 20000, 'LB1001', 'picked_up', NOW() - INTERVAL 2 HOUR, NOW() - INTERVAL 1 HOUR, NULL),
   (3, 10, 1, 1, 20000, 20000, 'DMT9TX', 'pending', NOW() - INTERVAL 1 HOUR, NULL, NULL),
   (4, 10, 2, 1, 15000, 15000, '69D7H7', 'pending', NOW() - INTERVAL 1 HOUR, NULL, NULL),
-  (5, 8, 3, 1, 45000, 45000, 'WWUQ4V', 'pending', NOW() - INTERVAL 1 HOUR, NULL, NULL),
+  (5, 8, 3, 1, 45000, 45000, 'WWUQ4V', 'picked_up', NOW() - INTERVAL 1 HOUR, NOW() - INTERVAL 30 MINUTE, NULL), -- đơn 5 và 11 đã nhận: người mua chính chỉ còn 1 đơn chờ (giới hạn 2 đơn chờ)
   (6, 10, 5, 2, 20000, 40000, 'U5233S', 'pending', NOW() - INTERVAL 1 HOUR, NULL, NULL),
   (7, 8, 6, 1, 25000, 25000, '33VRHA', 'cancelled', NOW() - INTERVAL 2 HOUR, NULL, NOW() - INTERVAL 1 HOUR),
   (8, 10, 7, 1, 25000, 25000, 'WCDK5D', 'pending', NOW() - INTERVAL 1 HOUR, NULL, NULL),
   (9, 8, 4, 1, 20000, 20000, 'RA57YS', 'picked_up', NOW() - INTERVAL 2 HOUR, NOW() - INTERVAL 1 HOUR, NULL),
   (10, 10, 15, 1, 25000, 25000, 'YMGPJN', 'picked_up', NOW() - INTERVAL 2 HOUR, NOW() - INTERVAL 1 HOUR, NULL),
-  (11, 8, 17, 2, 21000, 42000, '8N4P2T', 'pending', NOW() - INTERVAL 2 HOUR, NULL, NULL),
+  (11, 8, 17, 2, 21000, 42000, '8N4P2T', 'picked_up', NOW() - INTERVAL 2 HOUR, NOW() - INTERVAL 90 MINUTE, NULL), -- như đơn 5
   (12, 10, 17, 1, 21000, 21000, 'XC2MCU', 'pending', NOW() - INTERVAL 1 HOUR, NULL, NULL),
   (13, 8, 18, 1, 15000, 15000, 'UKKRE7', 'picked_up', NOW() - INTERVAL 6 HOUR, NOW() - INTERVAL 5 HOUR, NULL),
   (14, 10, 18, 1, 15000, 15000, 'XZZVKA', 'no_show', NOW() - INTERVAL 5 HOUR, NULL, NULL),
@@ -159,7 +174,6 @@ INSERT INTO notifications (user_id, title, content, is_read) VALUES
   (8, 'Đặt chỗ thành công', 'Mã nhận hàng đã sẵn sàng, hãy đến lấy trong khung giờ quy định.', 0);
 
 
-UPDATE listings SET status = 'hidden' WHERE id BETWEEN 8 AND 16;
 
 -- ---------------------------------------------------------------------
 -- TUỲ CHỌN: muốn test duyệt/khoá cửa hàng và khoá người mua, bỏ comment 3 dòng dưới

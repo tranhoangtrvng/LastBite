@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 
 export default function PickupCode({ 
-  code = 'LB-9482', 
-  expireTime = '21:30', 
+  code = '',
+  expireTime = '',
   pickupToday = true, 
   pickupDateLabel = '', 
   className = '' 

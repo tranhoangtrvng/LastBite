@@ -13,6 +13,8 @@ const { ORDER_SELECT, ORDER_STATUSES, formatOrder } = require('../utils/formatOr
 const { getBookingLeadMinutes, bookingOpensAt, formatClock } = require('../utils/timeRules');
 
 const MAX_QUANTITY_PER_ORDER = 5;
+// Chống giữ chỗ ảo: mỗi người mua chỉ được có tối đa chừng này đơn "chờ nhận" còn trong giờ nhận cùng lúc.
+const MAX_PENDING_ORDERS = 2;
 const MAX_CODE_ATTEMPTS = 5;
 
 // Chạy ROLLBACK nhưng không để lỗi của chính ROLLBACK che mất lỗi gốc.
@@ -45,9 +47,25 @@ const createOrder = asyncHandler(async (req, res) => {
   try {
     await conn.beginTransaction();
 
+    // 0. Giới hạn số đơn đang chờ nhận. Khoá dòng của chính người mua trước khi đếm, để hai lần bấm đặt
+    //    gửi cùng lúc không cùng lọt qua giới hạn. Đơn đã quá giờ nhận không tính (sắp thành "không đến").
+    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.user.id]);
+    const [[{ pendingCount }]] = await conn.query(
+      `SELECT COUNT(*) AS pendingCount
+       FROM orders o JOIN listings l ON l.id = o.listing_id
+       WHERE o.buyer_id = ? AND o.status = 'pending' AND l.pickup_end > NOW()`,
+      [req.user.id]
+    );
+    if (Number(pendingCount) >= MAX_PENDING_ORDERS) {
+      throw new AppError(
+        `Bạn đang có ${pendingCount} đơn chờ nhận. Mỗi người chỉ giữ tối đa ${MAX_PENDING_ORDERS} đơn cùng lúc, hãy nhận hoặc huỷ bớt trước khi đặt thêm`,
+        409
+      );
+    }
+
     // 1. Khoá dòng của tin (FOR UPDATE): người đặt khác phải chờ ta xong mới đọc/sửa được dòng này.
     const [listings] = await conn.query(
-      `SELECT id, store_id, status, sale_price, remaining, pickup_start,
+      `SELECT id, store_id, title, status, sale_price, remaining, pickup_start,
               (pickup_end > NOW()) AS before_end,
               (DATE_SUB(pickup_start, INTERVAL ? MINUTE) <= NOW()) AS booking_open
        FROM listings WHERE id = ? FOR UPDATE`,
@@ -56,7 +74,7 @@ const createOrder = asyncHandler(async (req, res) => {
     const listing = listings[0];
     if (!listing || listing.status !== 'active') throw new AppError('Không tìm thấy suất ăn', 404);
 
-    const [stores] = await conn.query('SELECT status FROM stores WHERE id = ?', [listing.store_id]);
+    const [stores] = await conn.query('SELECT status, owner_id FROM stores WHERE id = ?', [listing.store_id]);
     if (!stores[0] || stores[0].status !== 'approved') throw new AppError('Không tìm thấy suất ăn', 404);
 
     // 2. Các điều kiện đặt được (phân biệt rõ để báo đúng lý do)
@@ -100,8 +118,14 @@ const createOrder = asyncHandler(async (req, res) => {
     }
     if (orderId === null) throw new AppError('Không tạo được mã nhận hàng, vui lòng thử lại', 500);
 
-    // >>> [CHỜ QUYẾT ĐỊNH] Thông báo (P2): nếu muốn gửi thông báo "có đơn mới" cho chủ cửa hàng,
-    // >>> thêm một câu INSERT INTO notifications ... ngay tại đây (trước COMMIT). Hiện CHƯA làm.
+    // 4b. Thông báo "có đơn mới" cho chủ cửa hàng (xem bằng GET /api/notifications).
+    //     Nằm trong transaction: đơn lỗi thì thông báo cũng không được tạo.
+    //     KHÔNG ghi mã nhận hàng vào thông báo: cửa hàng phải nhận mã từ chính khách khi đến quầy.
+    await conn.query('INSERT INTO notifications (user_id, title, content) VALUES (?, ?, ?)', [
+      stores[0].owner_id,
+      'Có đơn mới',
+      `${req.user.name} vừa đặt ${quantity} suất "${listing.title}" (đơn #${orderId}).`,
+    ]);
 
     // 5. Mọi thứ thành công -> lưu.
     await conn.commit();
