@@ -7,4 +7,7 @@ export const storeApi = {
 
   // Đăng ký cửa hàng (trạng thái ban đầu: chờ admin duyệt)
   registerStore: (data) => axiosClient.post('/stores', data),
+  
+  // Sửa thông tin cửa hàng (PUT /stores/me)
+  updateMyStore: (data) => axiosClient.put('/stores/me', data),
 };

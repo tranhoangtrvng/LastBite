@@ -80,15 +80,15 @@ INSERT INTO users (id, name, email, password_hash, phone, role, status) VALUES
   (9, 'Admin LastBite', 'admin@lastbite.vn', @pw, '0912345609', 'admin', 'active'),
   (10, 'Lê Thu Hà', 'ha.lastbite@gmail.com', @pw, '0912345610', 'buyer', 'active');
 
--- 2. stores (7 quán của TV3; status 'active' của TV3 = 'approved' trong schema)
-INSERT INTO stores (id, owner_id, name, address, phone, description, status) VALUES
-  (1, 1, 'Bánh Mì Tuấn Khang', '76 Bạch Mai, Hai Bà Trưng, Hà Nội', '0912345601', 'Chuyên bánh mì kẹp thịt và xúc xích nướng gia truyền Bạch Mai.', 'approved'),
-  (2, 2, 'Bánh Mì Bơ Nướng Mật Ong', '102 Khâm Thiên, Đống Đa, Hà Nội', '0912345602', 'Bánh mì nướng bơ mật ong kèm xiên que thơm lừng phục vụ đêm.', 'approved'),
-  (3, 3, 'Pastrami Tây Hồ Deli', '48 Đ. Tây Hồ, Tây Hồ, Hà Nội', '0912345603', 'Tiệm bánh mì phong cách New York với món bò muối Pastrami trứ danh.', 'approved'),
-  (4, 4, 'Doner Kebab NEU', 'Cổng KTX ĐH Kinh Tế Quốc Dân, Trần Đại Nghĩa, HBT, Hà Nội', '0912345604', 'Bánh mì tam giác Kebab Thổ Nhĩ Kỳ sốt tỏi của sinh viên NEU.', 'approved'),
-  (5, 5, 'Kimbap Phố Bách Khoa', '101-K10A Nguyễn Hiền, Bách Khoa, HBT, Hà Nội', '0912345605', 'Ẩm thực Hàn Quốc giá sinh viên ngay trung tâm Bách Khoa.', 'approved'),
-  (6, 6, 'Cơm Sườn Đêm 183', 'Số 1 Ngõ 183 Trần Đại Nghĩa, Hai Bà Trưng, Hà Nội', '0912345606', 'Cơm tấm sườn nướng than hoa nóng hổi, xả món cứu trợ cuối ca tối.', 'approved'),
-  (7, 7, 'Cơm Gà Zòn 185', '185 Trần Đại Nghĩa, Hai Bà Trưng, Hà Nội', '0912345607', 'Thương hiệu cơm gà chiên giòn sốt cay quen thuộc đường Trần Đại Nghĩa.', 'approved');
+-- 2. stores (7 quán của TV3 kèm toạ độ thực tế cho bản đồ VT2)
+INSERT INTO stores (id, owner_id, name, address, phone, description, latitude, longitude, status) VALUES
+  (1, 1, 'Bánh Mì Tuấn Khang', '76 Bạch Mai, Hai Bà Trưng, Hà Nội', '0912345601', 'Chuyên bánh mì kẹp thịt và xúc xích nướng gia truyền Bạch Mai.', 21.006520, 105.850510, 'approved'),
+  (2, 2, 'Bánh Mì Bơ Nướng Mật Ong', '102 Khâm Thiên, Đống Đa, Hà Nội', '0912345602', 'Bánh mì nướng bơ mật ong kèm xiên que thơm lừng phục vụ đêm.', 21.018930, 105.836540, 'approved'),
+  (3, 3, 'Pastrami Tây Hồ Deli', '48 Đ. Tây Hồ, Tây Hồ, Hà Nội', '0912345603', 'Tiệm bánh mì phong cách New York với món bò muối Pastrami trứ danh.', 21.060120, 105.823650, 'approved'),
+  (4, 4, 'Doner Kebab NEU', 'Cổng KTX ĐH Kinh Tế Quốc Dân, Trần Đại Nghĩa, HBT, Hà Nội', '0912345604', 'Bánh mì tam giác Kebab Thổ Nhĩ Kỳ sốt tỏi của sinh viên NEU.', 21.000780, 105.842710, 'approved'),
+  (5, 5, 'Kimbap Phố Bách Khoa', '101-K10A Nguyễn Hiền, Bách Khoa, HBT, Hà Nội', '0912345605', 'Ẩm thực Hàn Quốc giá sinh viên ngay trung tâm Bách Khoa.', 21.004820, 105.845890, 'approved'),
+  (6, 6, 'Cơm Sườn Đêm 183', 'Số 1 Ngõ 183 Trần Đại Nghĩa, Hai Bà Trưng, Hà Nội', '0912345606', 'Cơm tấm sườn nướng than hoa nóng hổi, xả món cứu trợ cuối ca tối.', 20.999510, 105.843150, 'approved'),
+  (7, 7, 'Cơm Gà Zòn 185', '185 Trần Đại Nghĩa, Hai Bà Trưng, Hà Nội', '0912345607', 'Thương hiệu cơm gà chiên giòn sốt cay quen thuộc đường Trần Đại Nghĩa.', 20.999230, 105.843020, 'approved');
 
 -- 3. listings (24 tin). Tin 1-7 là dữ liệu và ảnh của TV3; tin 8-24 là tin bổ sung để test
 INSERT INTO listings (id, store_id, category_id, title, description, image_url, original_price, sale_price, quantity, remaining, pickup_start, pickup_end, status, created_at) VALUES
@@ -157,6 +157,9 @@ INSERT INTO reviews (order_id, rating, comment) VALUES
 INSERT INTO notifications (user_id, title, content, is_read) VALUES
   (7, 'Có đơn đặt mới', 'Khách Nguyễn Văn A vừa đặt 1 suất Cơm đùi gà chiên giòn rụm sốt cay.', 0),
   (8, 'Đặt chỗ thành công', 'Mã nhận hàng đã sẵn sàng, hãy đến lấy trong khung giờ quy định.', 0);
+
+
+UPDATE listings SET status = 'hidden' WHERE id BETWEEN 8 AND 16;
 
 -- ---------------------------------------------------------------------
 -- TUỲ CHỌN: muốn test duyệt/khoá cửa hàng và khoá người mua, bỏ comment 3 dòng dưới

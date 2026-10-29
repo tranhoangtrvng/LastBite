@@ -188,10 +188,10 @@ export default function StoreOrders() {
                         <p className="text-xs text-gray-500 mt-0.5">{customer} {phone ? `· ${phone}` : ''}</p>
                       </td>
                       <td className="px-6 py-4 font-semibold text-[#111827]">{title}</td>
-                      <td className="px-6 py-4 font-medium text-[#374151]">{order.quantity} suất</td>
-                      <td className="px-6 py-4 font-bold text-[#2563EB]">{formatMoney(order.total_price)}</td>
-                      <td className="px-6 py-4">{getStatusBadge(order.status)}</td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-4 font-medium text-[#374151] whitespace-nowrap">{order.quantity} suất</td>
+                      <td className="px-6 py-4 font-bold text-[#2563EB] whitespace-nowrap">{formatMoney(order.total_price)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(order.status)}</td>
+                      <td className="px-6 py-4 text-center whitespace-nowrap">
                         {isOverdue ? (
                           <div className="inline-flex items-center gap-2">
                             <span className="text-xs font-medium text-gray-500">Đã quá giờ nhận</span>

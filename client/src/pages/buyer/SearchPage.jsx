@@ -176,7 +176,7 @@ export default function SearchPage() {
   return (
     <div className="flex flex-col lg:flex-row gap-8 items-start">
       {/* CỘT TRÁI: BỘ LỌC TÌM KIẾM (SIDEBAR CỐ ĐỊNH KHI CUỘN) */}
-      <aside className="w-full lg:w-[280px] shrink-0 sticky top-28">
+      <aside className="w-full lg:w-[280px] shrink-0 lg:sticky lg:top-28 z-10">
         <FilterSidebar
           categoryOptions={categoryOptions}
           onApplyFilter={(receivedFilters) => setFilters(receivedFilters)}

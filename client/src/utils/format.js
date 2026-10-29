@@ -34,7 +34,10 @@ export function todayString() {
 }
 
 export const isoDate = (iso) => (iso ? iso.slice(0, 10) : '');
-export const isoTime = (iso) => (iso ? iso.slice(11, 16) : '');
+export const isoTime = (iso) => {
+  if (!iso) return '';
+  return iso.length === 5 ? iso : iso.slice(11, 16);
+};
 export const isToday = (iso) => isoDate(iso) === todayString();
 
 // "2026-10-24" -> "24/10"
