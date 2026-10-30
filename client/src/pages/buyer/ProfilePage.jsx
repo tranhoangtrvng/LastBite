@@ -1,12 +1,13 @@
 // client/src/pages/buyer/ProfilePage.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { authApi } from '../../api/authApi';
 import { storeApi } from '../../api/storeApi';
 import { orderApi } from '../../api/orderApi';
 import { formatMoney } from '../../utils/format';
 import Input from '../../components/common/Input';
+import ConfirmDialog from '../../components/admin/ConfirmDialog';
 
 const ROLE_LABELS = { buyer: 'Người mua', store: 'Cửa hàng', admin: 'Quản trị viên' };
 const PHONE_REGEX = /^\d{9,11}$/;
@@ -32,6 +33,9 @@ export default function ProfilePage() {
     status: '',
   });
   const [loadingStore, setLoadingStore] = useState(isStore);
+  // false = tài khoản cửa hàng nhưng CHƯA đăng ký quán (GET /stores/me trả data: null).
+  // Khi đó không hiện form sửa (PUT /stores/me sẽ bị 403), mà dẫn sang trang đăng ký quán /store.
+  const [hasStore, setHasStore] = useState(true);
   const [storeSaving, setStoreSaving] = useState(false);
   const [storeMessage, setStoreMessage] = useState({ type: '', text: '' });
 
@@ -41,6 +45,7 @@ export default function ProfilePage() {
       storeApi
         .getMyStore()
         .then((res) => {
+          setHasStore(Boolean(res.data));
           if (res.data) {
             setStoreData({
               name: res.data.name || '',
@@ -53,7 +58,9 @@ export default function ProfilePage() {
             });
           }
         })
-        .catch((err) => console.error('Lỗi tải thông tin quán:', err))
+        .catch((err) =>
+          setStoreMessage({ type: 'error', text: '❌ ' + (err.message || 'Không tải được thông tin quán.') })
+        )
         .finally(() => setLoadingStore(false));
     }
   }, [isStore]);
@@ -95,7 +102,7 @@ export default function ProfilePage() {
   // Nút lấy toạ độ GPS tự động bằng định vị trình duyệt
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
-      alert('Trình duyệt không hỗ trợ lấy toạ độ vị trí');
+      setStoreMessage({ type: 'error', text: '❌ Trình duyệt không hỗ trợ lấy toạ độ vị trí.' });
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -108,7 +115,10 @@ export default function ProfilePage() {
         setStoreMessage({ type: 'success', text: '📍 Đã lấy toạ độ GPS hiện tại thành công!' });
       },
       () => {
-        alert('Không thể lấy vị trí. Vui lòng cấp quyền định vị trong trình duyệt.');
+        setStoreMessage({
+          type: 'error',
+          text: '❌ Không thể lấy vị trí. Vui lòng cấp quyền định vị trong trình duyệt.',
+        });
       }
     );
   };
@@ -214,12 +224,13 @@ export default function ProfilePage() {
       .catch(() => {});
   }, [user]);
 
-  // Đăng xuất
-  const handleLogout = () => {
-    if (window.confirm('Bạn có chắc chắn muốn đăng xuất tài khoản?')) {
-      logout();
-      navigate('/auth');
-    }
+  // Đăng xuất (hộp xác nhận chung của dự án, thay window.confirm)
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const handleLogout = () => setConfirmLogout(true);
+  const doLogout = () => {
+    setConfirmLogout(false);
+    logout();
+    navigate('/auth');
   };
 
   return (
@@ -318,6 +329,20 @@ export default function ProfilePage() {
 
               {loadingStore ? (
                 <p className="text-sm text-gray-500 py-6 text-center">Đang tải thông tin quán...</p>
+              ) : !hasStore ? (
+                /* Tài khoản cửa hàng chưa có quán: đăng ký ở trang /store, sau đó chờ admin duyệt */
+                <div className="py-8 text-center space-y-3">
+                  <p className="text-sm font-semibold text-[#111827]">Bạn chưa đăng ký cửa hàng</p>
+                  <p className="text-xs text-[#6B7280]">
+                    Điền thông tin quán ở trang Quản lý cửa hàng và chờ admin duyệt, sau đó có thể sửa thông tin tại đây.
+                  </p>
+                  <Link
+                    to="/store"
+                    className="inline-block px-5 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition"
+                  >
+                    Đăng ký cửa hàng
+                  </Link>
+                </div>
               ) : (
                 <form onSubmit={handleSaveStore} className="space-y-4">
                   {storeMessage.text && (
@@ -591,6 +616,15 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmLogout}
+        title="Đăng xuất?"
+        message="Bạn có chắc chắn muốn đăng xuất tài khoản?"
+        confirmText="Đăng xuất"
+        danger
+        onConfirm={doLogout}
+        onCancel={() => setConfirmLogout(false)}
+      />
     </div>
   );
 }

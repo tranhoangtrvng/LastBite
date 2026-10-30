@@ -276,7 +276,7 @@ Lỗi: `400` dữ liệu không hợp lệ, `409` "Email đã được sử dụ
 
 #### POST /auth/login
 
-**Quyền:** Công khai. Có giới hạn tần suất: tối đa 10 lần sai trong 15 phút mỗi địa chỉ IP, vượt thì trả `429`.
+**Quyền:** Công khai. Có giới hạn tần suất: sai 5 lần cùng email (hoặc 30 lần trên một máy) trong 15 phút thì trả `429` (chi tiết ở phần Lỗi bên dưới).
 
 ```json
 {
@@ -311,8 +311,8 @@ Nếu `user.role` là `store`, `user` có thêm trường `store`: `null` nếu 
 Lỗi:
 
 - `401` "Email hoặc mật khẩu không đúng" (dùng chung một thông báo cho cả hai trường hợp, không cho biết email có tồn tại hay không).
+- `429` khi nhập sai **5 lần** với cùng email từ cùng một máy trong 15 phút (đăng nhập đúng sẽ xoá bộ đếm), hoặc một máy sai quá **30 lần** / 15 phút. Phản hồi có header `Retry-After` (số giây phải chờ). Tương tự: `POST /auth/forgot-password` tối đa 10 lần / 15 phút, `POST /auth/reset-password` tối đa 20 lần sai / 15 phút trên một máy.
 - `403` "Tài khoản đã bị khoá". Chỉ kiểm tra **sau khi mật khẩu đúng**.
-- `429` "Bạn đã thử quá nhiều lần, vui lòng thử lại sau".
 
 #### GET /auth/me
 
@@ -1242,4 +1242,5 @@ curl -X POST http://localhost:5000/api/orders \
 |---|---|---|
 | 15/10/2026 | Bản v1 đầu tiên | VT1 |
 | 27/10/2026 | Quy tắc giờ "cuối ngày": đăng tin chỉ trong ngày hôm nay; người mua chỉ đặt trong `BOOKING_LEAD_MINUTES` phút trước giờ nhận (thêm `booking_opens_at`, `is_booking_open`); tự động chuyển đơn quá giờ sang `no_show`; `confirm` bị chặn sau `pickup_end` | VT1 |
+| 30/10/2026 | Giới hạn đăng nhập sai (429) cho `/auth/login`, `/auth/forgot-password`, `/auth/reset-password`; thêm bộ kiểm thử `npm test` | VT1 |
 | 28/10/2026 | `POST /orders`: giới hạn 2 đơn chờ, tạo thông báo "Có đơn mới" cho chủ quán; làm 3 API `/notifications`; thêm `POST /auth/forgot-password`, `POST /auth/reset-password` (bảng `password_resets`) | VT1 |

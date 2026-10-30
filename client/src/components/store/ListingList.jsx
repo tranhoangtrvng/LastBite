@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import Button from '../common/Button';
 import { listingApi } from '../../api/listingApi';
 import ListingForm from './ListingForm';
+import ConfirmDialog from '../admin/ConfirmDialog';
 import { formatMoney, resolveImageUrl, isoTime, shortDate, PLACEHOLDER_IMAGE } from '../../utils/format';
 
 export default function ListingList({ store = null }) {
@@ -11,6 +12,9 @@ export default function ListingList({ store = null }) {
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [editingListing, setEditingListing] = useState(null);
+  // Tin đang chờ xác nhận xoá (thay window.confirm bằng hộp xác nhận chung của dự án)
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchListings = async () => {
     try {
@@ -29,14 +33,18 @@ export default function ListingList({ store = null }) {
     fetchListings();
   }, []);
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa tin này?')) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
     setActionError('');
+    setDeleting(true);
     try {
-      await listingApi.deleteListing(id);
+      await listingApi.deleteListing(deleteTarget.id);
       fetchListings();
     } catch (error) {
       setActionError(error.message);
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -154,7 +162,7 @@ export default function ListingList({ store = null }) {
                       <Button size="sm" variant="secondary" onClick={() => setEditingListing(item)}>
                         Sửa
                       </Button>
-                      <Button size="sm" variant="danger" onClick={() => handleDelete(item.id)}>
+                      <Button size="sm" variant="danger" onClick={() => setDeleteTarget(item)}>
                         Xóa
                       </Button>
                     </td>
@@ -165,6 +173,17 @@ export default function ListingList({ store = null }) {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Xoá tin đăng?"
+        message={`Tin "${deleteTarget?.title ?? ''}" sẽ bị xoá khỏi danh sách. Tin còn đơn đang chờ nhận thì không xoá được.`}
+        confirmText="Xoá tin"
+        danger
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

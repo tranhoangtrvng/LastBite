@@ -45,6 +45,8 @@ Khung giờ nhận của tin mẫu là 20:00 - 21:30 trong ngày chạy seed, n�
 >
 > **Quên mật khẩu:** gọi `POST /api/auth/forgot-password`, mã 6 số hiện ở **cửa sổ backend** (dự án chưa gửi email thật), rồi dùng `POST /api/auth/reset-password`.
 >
+> **Giới hạn đăng nhập sai:** sai mật khẩu 5 lần với cùng một email thì bị khoá đăng nhập 15 phút (mã 429); một máy sai quá 30 lần / 15 phút cũng bị khoá.
+>
 > **Giới hạn 2 đơn chờ:** mỗi người mua giữ tối đa 2 đơn "chờ nhận" cùng lúc. Sau khi chạy seed, `buyer.lastbite@gmail.com` có 1 đơn chờ (đặt thêm được 1), còn `ha.lastbite@gmail.com` có sẵn 5 đơn chờ nên sẽ bị chặn, dùng để demo luật này.
 
 > **Quy tắc giờ "cuối ngày":** cửa hàng chỉ đăng suất nhận hàng trong ngày hôm nay, và người mua chỉ thấy / đặt được suất trong khoảng `BOOKING_LEAD_MINUTES` phút trước giờ bắt đầu nhận (mặc định 120 phút = 2 tiếng). Vì tin mẫu bắt đầu nhận từ 19:00 - 20:30, nếu demo **ban ngày** mà không thấy món nào thì mở `server/.env`, thêm dòng `BOOKING_LEAD_MINUTES=1440`, rồi chạy lại backend. Đơn quá giờ nhận được server tự chuyển sang "Không đến" mỗi phút.
@@ -75,6 +77,52 @@ npm run dev
 Mở http://localhost:5173. Nếu backend chạy ở cổng khác, tạo file `client/.env` với dòng
 `VITE_API_URL=http://localhost:<cổng>/api`.
 
+## Chạy demo (buổi trình bày)
+
+**Trước buổi trình bày 1 ngày**
+1. Chọn **laptop chính** và **laptop dự phòng**; cả hai pull nhánh `main` mới nhất, chạy `npm install` ở `server` và `client`.
+2. Trên cả hai máy, mở `server/.env` và kiểm tra có `BOOKING_LEAD_MINUTES=1440` (để món hiện suốt cả ngày khi trình bày ban ngày).
+3. Chạy bộ kiểm thử (xem mục *Kiểm thử tự động*), phải ra `KẾT QUẢ: .../... đạt`.
+4. Quay video dự phòng toàn bộ kịch bản demo.
+
+**Ngay trước khi trình bày (khoảng 15 phút)**
+1. Bật MySQL. Ở thư mục gốc dự án, nạp lại dữ liệu demo bằng một lệnh (tự sao lưu database cũ vào `database/backups/` trước):
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\demo-reset.ps1
+   ```
+   Dữ liệu mẫu có giờ nhận theo **ngày chạy lệnh**, nên phải chạy lại vào đúng ngày trình bày.
+2. Mở 2 cửa sổ PowerShell: `cd server` → `npm run dev` và `cd client` → `npm run dev`. Mở http://localhost:5173.
+3. Đăng nhập sẵn 3 vai trò ở 3 cửa sổ trình duyệt (cửa sổ ẩn danh cho từng vai trò), đặt cửa sổ backend cạnh trình duyệt (để thấy mã quên mật khẩu).
+
+**Kịch bản gợi ý (khoảng 7 phút)**
+1. Người mua `buyer.lastbite@gmail.com`: tìm, lọc, xem chi tiết (đếm ngược), đặt 1 suất → nhận mã 6 ký tự.
+2. Cửa hàng `tuankhang76@gmail.com`: thấy đơn mới, nhập mã → "Đã nhận"; xem dashboard.
+3. Người mua đặt thêm → bị chặn ở đơn chờ thứ 3 (giới hạn 2 đơn); hoặc dùng `ha.lastbite@gmail.com` (đã có sẵn 5 đơn chờ).
+4. Admin `admin@lastbite.vn`: thống kê "suất đã cứu", duyệt/khoá cửa hàng.
+5. Quên mật khẩu: mã 6 số hiện ở cửa sổ backend.
+
+**Sự cố thường gặp**
+
+| Hiện tượng | Cách xử lý |
+|---|---|
+| "Không tải được danh sách suất ăn" | Backend chưa chạy hoặc đã tắt |
+| Danh sách trống | Chưa chạy `demo-reset.ps1` hôm nay, hoặc thiếu `BOOKING_LEAD_MINUTES=1440` |
+| `EADDRINUSE :5000` | Còn bản backend cũ đang chạy ở cửa sổ khác, tắt đi rồi chạy lại |
+| Đăng nhập báo "nhập sai quá 5 lần" | Đợi 15 phút, hoặc gõ `rs` ở cửa sổ backend (bộ đếm nằm trong bộ nhớ server) |
+| Database hỏng giữa buổi | Chạy lại `demo-reset.ps1`; hoặc nạp bản sao lưu cùng ngày: `mysql -u root -p lastbite -e "source database/backups/<tên-file>.sql"` |
+
+## Kiểm thử tự động
+
+Bộ kiểm thử nằm trong `server/tests/` (35 phép thử): đăng nhập và phân quyền, tìm kiếm, đặt chỗ, giới hạn 2 đơn chờ, huỷ trả suất, xác nhận mã, thông báo, quên mật khẩu, giới hạn đăng nhập sai (429) và **chống bán lố khi 20 người đặt cùng lúc**.
+
+```powershell
+# cửa sổ 1: backend đang chạy (npm run dev); cửa sổ 2:
+cd server
+npm test
+```
+
+Kiểm thử tự tạo tài khoản và tin thử ("Test LastBite", "[TEST] ...") rồi **tự dọn sạch** khi xong, không ảnh hưởng dữ liệu demo. Chạy nên trước 23:45 (tin thử phải nằm trong ngày). Chạy quá khoảng 4 lần trong 15 phút thì gõ `rs` ở cửa sổ backend để xoá bộ đếm đăng nhập sai.
+
 ## Tài khoản dùng thử (sau khi chạy seed)
 
 Mọi tài khoản dùng chung mật khẩu **`Demo@123`**. Đăng nhập bằng **email**.
@@ -104,13 +152,17 @@ LastBite/
 │   └── src/
 │       ├── config/          Kết nối MySQL
 │       ├── controllers/     Xử lý nghiệp vụ
-│       ├── middlewares/     Xác thực, phân quyền, upload, xử lý lỗi
+│       ├── middlewares/     Xác thực, phân quyền, upload, xử lý lỗi, giới hạn đăng nhập sai (rateLimit.js)
 │       ├── routes/          Định nghĩa đường dẫn API
 │       ├── jobs/            Tác vụ nền (mỗi phút đổi đơn quá giờ nhận sang "không đến")
 │       └── utils/           Hàm dùng chung (định dạng dữ liệu, mã nhận hàng, phân trang, quy tắc giờ timeRules.js)
+│   └── tests/               Kiểm thử tự động (npm test)
+├── scripts/
+│   └── demo-reset.ps1       Sao lưu + nạp lại dữ liệu demo bằng một lệnh
 ├── database/
 │   ├── schema.sql           Tạo database và các bảng
-│   └── seed.sql             Dữ liệu mẫu để demo và test
+│   ├── seed.sql             Dữ liệu mẫu để demo và test
+│   └── seed_images.sql      Gán ảnh riêng cho các tin mẫu (chạy sau seed.sql)
 └── docs/
     └── api.md               Tài liệu API (hợp đồng giữa frontend và backend)
 ```
@@ -123,7 +175,8 @@ Khi cần đổi API, **sửa `docs/api.md` trước** rồi báo cả nhóm.
 ## Quy trình làm việc của nhóm
 
 - Họp nhóm **21:00 mỗi thứ Bảy**. Công việc và tiến độ theo dõi trên **Notion**.
-- Mỗi người làm trên nhánh riêng, mở Pull Request vào `main` và chờ người khác review trước khi gộp.
+- Mỗi người làm trên nhánh riêng, mở Pull Request vào **`fix/fixed-develop`** (nhánh tích hợp) và chờ người khác review trước khi gộp. Trước khi bấm Merge: pull về máy, chạy `npm test`, mở thử giao diện.
+- Bản cuối cùng: mở **một** Pull Request từ `fix/fixed-develop` vào `main` (xem hướng dẫn trong lần bàn giao), không đẩy thẳng lên `main`.
 - Không commit `.env` và `node_modules`.
 
 Mốc thời gian: demo nội bộ **24/10**, chốt tính năng (Feature Freeze) **28/10**, nộp bài **01/11/2026**.
